@@ -1,6 +1,8 @@
 package com.example.Sistema_Gestion.model;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 
 @Entity
 @Table(name="remito_item")
@@ -8,9 +10,13 @@ public class RemitoItem {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+
+
     @ManyToOne
     @JoinColumn(name="remito_id", nullable=false)
+    @JsonBackReference
     private Remito remito;
+
 
     @ManyToOne
     @JoinColumn(name="producto_id", nullable=false)

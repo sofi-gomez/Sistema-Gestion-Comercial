@@ -1,4 +1,5 @@
 package com.example.Sistema_Gestion.model;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -25,6 +26,7 @@ public class Venta {
     private String estado;
 
     @OneToMany(mappedBy="venta", cascade=CascadeType.ALL, orphanRemoval=true)
+    @JsonManagedReference
     private List<VentaItem> items;
 
     private LocalDateTime createdAt;

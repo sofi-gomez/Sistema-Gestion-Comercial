@@ -1,25 +1,28 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import ClientesPage from './pages/Clientespage';
-import HomePage from './pages/Homepage';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route} from "react-router-dom";
+import HomePage from "./pages/Homepage";
+import Clientespage from "./pages/Clientespage";
+import Mercaderiapage from "./pages/Mercaderiapage";
+import Proveedorespage from './pages/Proveedorespage';
+import Ventaspage from './pages/Ventaspage';
+import Tesoreriapage from './pages/Tesoreriapage';
+import Remitospage from './pages/Remitospage';
 
 function App() {
   return (
     <Router>
-      <div style={{ padding: '20px' }}>
-        <h1>Sistema de Gestión Comercial</h1>
-        <nav style={{ marginBottom: '20px' }}>
-          <Link to="/" style={{ marginRight: '10px' }}>Inicio</Link>
-          <Link to="/clientes">Clientes</Link>
-        </nav>
-
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/clientes" element={<ClientesPage />} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/clientes" element={<Clientespage />} />
+        <Route path="/mercaderia" element={<Mercaderiapage />} />
+        <Route path="/proveedores" element={<Proveedorespage />} />
+        <Route path="/ventas" element={<Ventaspage />} />
+        <Route path="/tesoreria" element={<Tesoreriapage />} />
+        <Route path="/remitos" element={<Remitospage />} />
+      </Routes>
     </Router>
   );
 }
+
 
 export default App;
