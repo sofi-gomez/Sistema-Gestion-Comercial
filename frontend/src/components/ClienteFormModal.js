@@ -1,49 +1,74 @@
 import React, { useState, useEffect } from "react";
 import "../index.css";
 
-export default function ProveedoresFormModal({ proveedor, onClose, onSave }) {
+export default function ClienteFormModal({ cliente, onClose, onSave }) {
   const [form, setForm] = useState({
     nombre: "",
-    cuit: "",
+    documento: "",
     direccion: "",
     telefono: "",
     email: "",
-    condicionIva: "",
     notas: ""
   });
 
+  const [errors, setErrors] = useState({});
+
   useEffect(() => {
-    if (proveedor) {
+    if (cliente) {
       setForm({
-        nombre: proveedor.nombre || "",
-        cuit: proveedor.cuit || "",
-        direccion: proveedor.direccion || "",
-        telefono: proveedor.telefono || "",
-        email: proveedor.email || "",
-        condicionIva: proveedor.condicionIva || proveedor.condicion_iva || "",
-        notas: proveedor.notas || ""
+        nombre: cliente.nombre || "",
+        documento: cliente.documento || "",
+        direccion: cliente.direccion || "",
+        telefono: cliente.telefono || "",
+        email: cliente.email || "",
+        notas: cliente.notas || ""
       });
     } else {
       setForm({
         nombre: "",
-        cuit: "",
+        documento: "",
         direccion: "",
         telefono: "",
         email: "",
-        condicionIva: "",
         notas: ""
       });
     }
-  }, [proveedor]);
+    setErrors({});
+  }, [cliente]);
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!form.nombre.trim()) {
+      newErrors.nombre = "El nombre es requerido";
+    }
+    
+    if (form.email && !/\S+@\S+\.\S+/.test(form.email)) {
+      newErrors.email = "El email no es válido";
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
+    
+    // Limpiar error cuando el usuario empiece a escribir
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: "" }));
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const payload = proveedor ? { ...form, id: proveedor.id } : form;
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    const payload = cliente ? { ...form, id: cliente.id } : form;
     onSave(payload);
   };
 
@@ -51,7 +76,7 @@ export default function ProveedoresFormModal({ proveedor, onClose, onSave }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{proveedor ? "Editar Proveedor" : "Nuevo Proveedor"}</h2>
+          <h2>{cliente ? "Editar Cliente" : "Nuevo Cliente"}</h2>
           <button onClick={onClose} className="modal-close">×</button>
         </div>
 
@@ -64,20 +89,21 @@ export default function ProveedoresFormModal({ proveedor, onClose, onSave }) {
                   name="nombre" 
                   value={form.nombre} 
                   onChange={handleChange} 
-                  className="modern-input" 
+                  className={`modern-input ${errors.nombre ? 'error' : ''}`}
                   required 
-                  placeholder="Nombre del proveedor"
+                  placeholder="Nombre completo del cliente"
                 />
+                {errors.nombre && <span className="error-message">{errors.nombre}</span>}
               </div>
 
               <div className="form-group">
-                <label className="form-label">CUIT</label>
+                <label className="form-label">Documento</label>
                 <input 
-                  name="cuit" 
-                  value={form.cuit} 
+                  name="documento" 
+                  value={form.documento} 
                   onChange={handleChange} 
                   className="modern-input" 
-                  placeholder="00-00000000-0"
+                  placeholder="DNI, CUIT, etc."
                 />
               </div>
 
@@ -98,26 +124,11 @@ export default function ProveedoresFormModal({ proveedor, onClose, onSave }) {
                   name="email" 
                   value={form.email} 
                   onChange={handleChange} 
-                  className="modern-input" 
-                  placeholder="proveedor@ejemplo.com"
+                  className={`modern-input ${errors.email ? 'error' : ''}`}
+                  placeholder="cliente@ejemplo.com"
                   type="email"
                 />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Condición IVA</label>
-                <select 
-                  name="condicionIva" 
-                  value={form.condicionIva} 
-                  onChange={handleChange} 
-                  className="modern-input"
-                >
-                  <option value="">Seleccionar...</option>
-                  <option value="Responsable Inscripto">Responsable Inscripto</option>
-                  <option value="Monotributista">Monotributista</option>
-                  <option value="Exento">Exento</option>
-                  <option value="Consumidor Final">Consumidor Final</option>
-                </select>
+                {errors.email && <span className="error-message">{errors.email}</span>}
               </div>
 
               <div className="form-group full-width">
@@ -138,7 +149,7 @@ export default function ProveedoresFormModal({ proveedor, onClose, onSave }) {
                   value={form.notas} 
                   onChange={handleChange} 
                   className="modern-textarea" 
-                  placeholder="Información adicional sobre el proveedor"
+                  placeholder="Información adicional sobre el cliente"
                   rows="3"
                 />
               </div>
@@ -150,7 +161,7 @@ export default function ProveedoresFormModal({ proveedor, onClose, onSave }) {
               Cancelar
             </button>
             <button type="submit" className="btn-primary">
-              {proveedor ? "Actualizar Proveedor" : "Crear Proveedor"}
+              {cliente ? "Actualizar Cliente" : "Crear Cliente"}
             </button>
           </div>
         </form>

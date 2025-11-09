@@ -6,21 +6,36 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
     sku: "",
     nombre: "",
     descripcion: "",
-    precioCosto: 0,
-    precioVenta: 0,
-    stock: 0,
+    precioCosto: "",
+    precioVenta: "",
+    stock: "",
     unidadMedida: "",
     activo: true,
   });
 
   useEffect(() => {
     if (producto) {
-      // make sure numeric values convert to simple values for inputs
       setForm({
-        ...producto,
-        precioCosto: producto.precioCosto ?? 0,
-        precioVenta: producto.precioVenta ?? 0,
-        stock: producto.stock ?? 0,
+        sku: producto.sku || "",
+        nombre: producto.nombre || "",
+        descripcion: producto.descripcion || "",
+        precioCosto: producto.precioCosto?.toString() || "",
+        precioVenta: producto.precioVenta?.toString() || "",
+        stock: producto.stock?.toString() || "",
+        unidadMedida: producto.unidadMedida || "",
+        activo: producto.activo ?? true,
+      });
+    } else {
+      // Reset form for new product
+      setForm({
+        sku: "",
+        nombre: "",
+        descripcion: "",
+        precioCosto: "",
+        precioVenta: "",
+        stock: "",
+        unidadMedida: "",
+        activo: true,
       });
     }
   }, [producto]);
@@ -33,67 +48,143 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // ensure numeric fields are numbers (and not empty strings)
+    
+    // Convertir campos numéricos
     const payload = {
       ...form,
-      precioCosto: Number(form.precioCosto || 0),
-      precioVenta: Number(form.precioVenta || 0),
-      stock: Number(form.stock || 0),
+      precioCosto: form.precioCosto ? parseFloat(form.precioCosto) : 0,
+      precioVenta: form.precioVenta ? parseFloat(form.precioVenta) : 0,
+      stock: form.stock ? parseFloat(form.stock) : 0,
     };
+
+    // Si estamos editando, mantener el ID
+    if (producto?.id) {
+      payload.id = producto.id;
+    }
+
     onSave(payload);
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-card" role="dialog" aria-modal="true">
-        <h2>{producto ? "Editar producto" : "Nuevo producto"}</h2>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{producto ? "Editar Producto" : "Nuevo Producto"}</h2>
+          <button onClick={onClose} className="modal-close">×</button>
+        </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="form-grid">
-            <div>
-              <label className="form-label">SKU</label>
-              <input name="sku" value={form.sku || ""} onChange={handleChange} className="input" required />
-            </div>
+          <div className="modal-content">
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">SKU *</label>
+                <input 
+                  name="sku" 
+                  value={form.sku} 
+                  onChange={handleChange} 
+                  className="modern-input" 
+                  required 
+                  placeholder="Ej: PROD-001"
+                />
+              </div>
 
-            <div>
-              <label className="form-label">Nombre</label>
-              <input name="nombre" value={form.nombre || ""} onChange={handleChange} className="input" required />
-            </div>
+              <div className="form-group">
+                <label className="form-label">Nombre *</label>
+                <input 
+                  name="nombre" 
+                  value={form.nombre} 
+                  onChange={handleChange} 
+                  className="modern-input" 
+                  required 
+                  placeholder="Nombre del producto"
+                />
+              </div>
 
-            <div className="form-row-single">
-              <label className="form-label">Descripción</label>
-              <textarea name="descripcion" value={form.descripcion || ""} onChange={handleChange} className="textarea" />
-            </div>
+              <div className="form-group full-width">
+                <label className="form-label">Descripción</label>
+                <textarea 
+                  name="descripcion" 
+                  value={form.descripcion} 
+                  onChange={handleChange} 
+                  className="modern-textarea" 
+                  placeholder="Descripción detallada del producto"
+                  rows="3"
+                />
+              </div>
 
-            <div>
-              <label className="form-label">Precio costo</label>
-              <input type="number" step="0.01" name="precioCosto" value={form.precioCosto} onChange={handleChange} className="input" />
-            </div>
+              <div className="form-group">
+                <label className="form-label">Precio Costo</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  name="precioCosto" 
+                  value={form.precioCosto} 
+                  onChange={handleChange} 
+                  className="modern-input" 
+                  placeholder="0.00"
+                />
+              </div>
 
-            <div>
-              <label className="form-label">Precio venta</label>
-              <input type="number" step="0.01" name="precioVenta" value={form.precioVenta} onChange={handleChange} className="input" />
-            </div>
+              <div className="form-group">
+                <label className="form-label">Precio Venta</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  name="precioVenta" 
+                  value={form.precioVenta} 
+                  onChange={handleChange} 
+                  className="modern-input" 
+                  placeholder="0.00"
+                />
+              </div>
 
-            <div>
-              <label className="form-label">Stock</label>
-              <input type="number" step="0.0001" name="stock" value={form.stock} onChange={handleChange} className="input" />
-            </div>
+              <div className="form-group">
+                <label className="form-label">Stock</label>
+                <input 
+                  type="number" 
+                  step="0.0001" 
+                  name="stock" 
+                  value={form.stock} 
+                  onChange={handleChange} 
+                  className="modern-input" 
+                  placeholder="0"
+                />
+              </div>
 
-            <div>
-              <label className="form-label">Unidad de medida</label>
-              <input name="unidadMedida" value={form.unidadMedida || ""} onChange={handleChange} className="input" />
-            </div>
+              <div className="form-group">
+                <label className="form-label">Unidad de Medida</label>
+                <input 
+                  name="unidadMedida" 
+                  value={form.unidadMedida} 
+                  onChange={handleChange} 
+                  className="modern-input" 
+                  placeholder="Ej: kg, unidades, litros"
+                />
+              </div>
 
-            <div style={{display:'flex', alignItems:'center', gap:8}}>
-              <input id="activo" type="checkbox" name="activo" checked={!!form.activo} onChange={handleChange} />
-              <label htmlFor="activo" className="form-label" style={{margin:0}}>Activo</label>
+              <div className="form-group full-width">
+                <label className="checkbox-label">
+                  <input 
+                    type="checkbox" 
+                    name="activo" 
+                    checked={form.activo} 
+                    onChange={handleChange} 
+                    className="modern-checkbox"
+                  />
+                  <span className="checkmark"></span>
+                  Producto activo
+                </label>
+              </div>
             </div>
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn-primary">Guardar</button>
+            <button type="button" className="btn-secondary" onClick={onClose}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn-primary">
+              {producto ? "Actualizar Producto" : "Crear Producto"}
+            </button>
           </div>
         </form>
       </div>

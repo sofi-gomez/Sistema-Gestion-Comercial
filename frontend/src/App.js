@@ -1,28 +1,27 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route} from "react-router-dom";
-import HomePage from "./pages/Homepage";
-import Clientespage from "./pages/Clientespage";
-import Mercaderiapage from "./pages/Mercaderiapage";
-import Proveedorespage from './pages/Proveedorespage';
-import Ventaspage from './pages/Ventaspage';
-import Tesoreriapage from './pages/Tesoreriapage';
-import Remitospage from './pages/Remitospage';
+import HomePage from "./pages/Homepage"; // Verificar casing
+import ClientesPage from "./pages/Clientespage"; // Con P mayúscula
+import MercaderiaPage from "./pages/Mercaderiapage"; // Verificar casing
+import ProveedoresPage from './pages/Proveedorespage'; // Verificar casing
+import VentasPage from './pages/Ventaspage'; // Verificar casing
+import TesoreriaPage from './pages/Tesoreriapage'; // Verificar casing
+import RemitosPage from './pages/Remitospage'; // Verificar casing
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/clientes" element={<Clientespage />} />
-        <Route path="/mercaderia" element={<Mercaderiapage />} />
-        <Route path="/proveedores" element={<Proveedorespage />} />
-        <Route path="/ventas" element={<Ventaspage />} />
-        <Route path="/tesoreria" element={<Tesoreriapage />} />
-        <Route path="/remitos" element={<Remitospage />} />
+        <Route path="/clientes" element={<ClientesPage />} />
+        <Route path="/mercaderia" element={<MercaderiaPage />} />
+        <Route path="/proveedores" element={<ProveedoresPage />} />
+        <Route path="/ventas" element={<VentasPage />} />
+        <Route path="/tesoreria" element={<TesoreriaPage />} />
+        <Route path="/remitos" element={<RemitosPage />} />
       </Routes>
     </Router>
   );
 }
-
 
 export default App;

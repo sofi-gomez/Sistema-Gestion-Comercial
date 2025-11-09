@@ -4,12 +4,12 @@ import { FiShoppingCart, FiPackage, FiUsers, FiFileText, FiDollarSign, FiBarChar
 import "../index.css";
 
 const modules = [
-  { title: "Mercadería", desc: "Carga de productos y stock", path: "/mercaderia", icon: <FiPackage /> },
-  { title: "Proveedores", desc: "Remitos, facturas y datos", path: "/proveedores", icon: <FiUsers /> },
-  { title: "Ventas", desc: "Registrar operaciones e historial", path: "/ventas", icon: <FiShoppingCart /> },
-  { title: "Tesorería", desc: "Movimientos y medios de pago", path: "/tesoreria", icon: <FiDollarSign /> },
-  { title: "Remitos", desc: "Gestión de remitos", path: "/remitos", icon: <FiFileText /> },
-  { title: "Informes", desc: "Visualización y estadísticas", path: "/informes", icon: <FiBarChart2 /> },
+  { title: "Mercadería", desc: "Carga de productos y stock", path: "/mercaderia", icon: <FiPackage />, color: "from-green-500 to-emerald-600" },
+  { title: "Ventas", desc: "Registrar ventas e historial", path: "/ventas", icon: <FiShoppingCart />, color: "from-green-500 to-emerald-600" },
+  { title: "Clientes", desc: "Datos de contacto", path: "/clientes", icon: <FiBarChart2 />, color: "from-green-500 to-emerald-600" },
+  { title: "Remitos", desc: "Gestión de remitos", path: "/remitos", icon: <FiFileText />, color: "from-green-500 to-emerald-600" },
+  { title: "Proveedores", desc: "Datos de contacto", path: "/proveedores", icon: <FiUsers />, color: "from-green-500 to-emerald-600"},
+  { title: "Tesorería", desc: "Movimientos del negocio", path: "/tesoreria", icon: <FiDollarSign />, color: "from-green-500 to-emerald-600" },
 ];
 
 export default function HomePage() {
@@ -17,46 +17,59 @@ export default function HomePage() {
 
   return (
     <div className="home-root">
+      {/* Header más compacto */}
       <header className="home-header">
         <div className="brand">
-          <img src="/assets/logo.png" alt="Logo" className="brand-logo" />
+          <div className="logo-container">
+            <img src="/isotipo.png" alt="Logo" className="brand-logo" />
+          </div>
           <div className="brand-text">
             <h1>LEONEL GOMEZ</h1>
-            <p className="subtitle">Agro-Ferreteria</p>
+            <p className="subtitle">Agro-Ferretería</p>
           </div>
-        </div>
-        <div className="header-actions">
-          <button className="btn-ghost">Usuario</button>
         </div>
       </header>
 
+      {/* Main Content más compacto */}
       <main className="home-main">
-        <div className="cards-grid wide">
-          {modules.map((m) => (
-            <article
-              key={m.title}
-              className="card large"
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate(m.path)}
-              onKeyDown={(e) => (e.key === "Enter" ? navigate(m.path) : null)}
-            >
-              <div className="card-left">
-                <div className="card-icon-wrap">
-                  <div className="card-icon">{m.icon}</div>
+        <div className="modules-section">
+          <div className="cards-grid">
+            {modules.map((m) => (
+              <article
+                key={m.title}
+                className={`module-card ${m.color}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(m.path)}
+                onKeyDown={(e) => (e.key === "Enter" ? navigate(m.path) : null)}
+              >
+                <div className="card-content">
+                  <div className="icon-container">
+                    <div className="card-icon">{m.icon}</div>
+                  </div>
+                  <div className="card-text">
+                    <h4 className="card-title">{m.title}</h4>
+                    <p className="card-desc">{m.desc}</p>
+                  </div>
+                  <div className="card-arrow">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                  </div>
                 </div>
-                <div className="card-text">
-                  <div className="card-title">{m.title}</div>
-                  <div className="card-sub">{m.desc}</div>
-                </div>
-              </div>
-              <div className="card-right">›</div>
-            </article>
-          ))}
+              </article>
+            ))}
+          </div>
         </div>
       </main>
 
-      <footer className="home-footer">© {new Date().getFullYear()} Leonel Gomez — Agro-Ferretería</footer>
+      {/* Footer más compacto */}
+      <footer className="home-footer">
+        <div className="footer-content">
+          <p>© {new Date().getFullYear()} Leonel Gomez — Agro-Ferretería</p>
+          <p className="footer-tagline">NUESTRAS PLANTAS NUNCA DUERMEN</p>
+        </div>
+      </footer>
     </div>
   );
 }

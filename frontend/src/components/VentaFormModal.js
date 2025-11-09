@@ -1,39 +1,24 @@
 import React, { useEffect, useState } from "react";
+import { FiPlus, FiTrash2 } from "react-icons/fi";
 import "../index.css";
 
-/*
- Payload esperado (ajusta si tu backend usa otros nombres):
- {
-   cliente: { id: <clienteId> },
-   items: [
-     { producto: { id: <productoId> }, cantidad: 2.5, precioUnitario: 100.0, subtotal: 250.0 },
-     ...
-   ],
-   total: 250.0,
-   estado: "COMPLETA"
- }
-*/
-
 export default function VentaFormModal({ onClose, onSaved }) {
-  const [clientes, setClientes] = useState([]);
   const [productos, setProductos] = useState([]);
   const [items, setItems] = useState([]);
-  const [clienteId, setClienteId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [medioPago, setMedioPago] = useState("EFECTIVO"); // MOVER ESTE useState ARRIBA
 
-  const API_CLIENTES = "http://localhost:8080/api/clientes";
   const API_PRODUCTOS = "http://localhost:8080/api/productos";
   const API_VENTAS = "http://localhost:8080/api/ventas";
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [rc, rp] = await Promise.all([fetch(API_CLIENTES), fetch(API_PRODUCTOS)]);
-        const [clientesJson, productosJson] = await Promise.all([rc.json(), rp.json()]);
-        setClientes(clientesJson || []);
+        const response = await fetch(API_PRODUCTOS);
+        const productosJson = await response.json();
         setProductos(productosJson || []);
       } catch (err) {
-        console.error("Error cargando clientes/productos:", err);
+        console.error("Error cargando productos:", err);
       } finally {
         setLoading(false);
       }
@@ -43,8 +28,7 @@ export default function VentaFormModal({ onClose, onSaved }) {
 
   useEffect(() => {
     if (items.length === 0) addEmptyItem();
-    // eslint-disable-next-line
-  }, [productos, clientes]);
+  }, [productos]);
 
   const addEmptyItem = () => {
     setItems((s) => [...s, { productoId: "", cantidad: 1, precioUnitario: 0, subtotal: 0 }]);
@@ -77,15 +61,16 @@ export default function VentaFormModal({ onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!clienteId) return alert("Seleccione un cliente.");
+    
+    // Validar items
     if (items.length === 0) return alert("Agregue al menos un item.");
     for (const it of items) {
       if (!it.productoId) return alert("Complete todos los productos.");
       if (!it.cantidad || Number(it.cantidad) <= 0) return alert("Cantidad inválida en un item.");
     }
 
+    // Preparar payload
     const payload = {
-      cliente: { id: clienteId },
       items: items.map((it) => ({
         producto: { id: it.productoId },
         cantidad: Number(it.cantidad),
@@ -93,7 +78,8 @@ export default function VentaFormModal({ onClose, onSaved }) {
         subtotal: Number(it.subtotal)
       })),
       total: Number(calcularTotal()),
-      estado: "COMPLETA"
+      estado: "COMPLETA",
+      medioPago: medioPago // Incluir medio de pago
     };
 
     try {
@@ -113,65 +99,141 @@ export default function VentaFormModal({ onClose, onSaved }) {
     }
   };
 
+  // El loading state debe ir DESPUÉS de todos los hooks
   if (loading) {
     return (
       <div className="modal-overlay">
-        <div className="modal-card">Cargando...</div>
+        <div className="modal-card">
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            <p>Cargando productos...</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-card" style={{maxWidth:1100}}>
-        <h2 style={{margin:0}}>Registrar Venta Interna</h2>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1000 }}>
+        <div className="modal-header">
+          <h2>Registrar Nueva Venta</h2>
+          <button onClick={onClose} className="modal-close">×</button>
+        </div>
 
-        <form onSubmit={handleSubmit} style={{marginTop:12}}>
-          <div style={{marginBottom:12}}>
-            <label className="form-label">Cliente</label>
-            <select className="input" value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
-              <option value="">-- Seleccione cliente --</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre} {c.documento ? `(${c.documento})` : ""}</option>
-              ))}
-            </select>
-          </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-content">
+            {/* Selector de medio de pago */}
+            <div className="form-group">
+              <label className="form-label">Medio de Pago</label>
+              <select 
+                value={medioPago} 
+                onChange={(e) => setMedioPago(e.target.value)} 
+                className="modern-input"
+              >
+                <option value="EFECTIVO">Efectivo</option>
+                <option value="TRANSFERENCIA">Transferencia</option>
+                <option value="TARJETA_DEBITO">Tarjeta Débito</option>
+                <option value="TARJETA_CREDITO">Tarjeta Crédito</option>
+                <option value="MERCADO_PAGO">Mercado Pago</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+            </div>
 
-          <div style={{marginTop:8}}>
-            <label className="form-label">Items</label>
+            {/* Items de la venta */}
+            <div className="form-group full-width">
+              <div className="items-header">
+                <label className="form-label">Productos Vendidos</label>
+                <button type="button" onClick={addEmptyItem} className="btn-primary small">
+                  <FiPlus />
+                  Agregar Producto
+                </button>
+              </div>
 
-            <div style={{display:'grid', gap:12}}>
-              {items.map((it, idx) => (
-                <div key={idx} style={{display:'grid', gridTemplateColumns: '48% 12% 12% 18% 10%', gap:12, alignItems:'center'}}>
-                  <select className="input" value={it.productoId} onChange={(e) => handleProductoChange(idx, e.target.value)}>
-                    <option value="">-- producto --</option>
-                    {productos.map((p) => <option key={p.id} value={p.id}>{p.nombre} {p.sku ? `(${p.sku})` : ""} - stock: {p.stock}</option>)}
-                  </select>
+              <div className="items-container">
+                {items.map((it, idx) => (
+                  <div key={idx} className="item-row">
+                    <div className="item-producto">
+                      <select 
+                        className="modern-input" 
+                        value={it.productoId} 
+                        onChange={(e) => handleProductoChange(idx, e.target.value)}
+                        required
+                      >
+                        <option value="">-- Seleccione producto --</option>
+                        {productos.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} {p.sku ? `(${p.sku})` : ""} - Stock: {p.stock}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <input className="input" type="number" step="0.0001" value={it.cantidad} onChange={(e) => updateItem(idx, { cantidad: e.target.value })} />
+                    <div className="item-cantidad">
+                      <input 
+                        className="modern-input" 
+                        type="number" 
+                        step="0.0001" 
+                        min="0.0001"
+                        value={it.cantidad} 
+                        onChange={(e) => updateItem(idx, { cantidad: e.target.value })}
+                        placeholder="Cantidad"
+                        required
+                      />
+                    </div>
 
-                  <input className="input" type="number" step="0.01" value={it.precioUnitario} onChange={(e) => updateItem(idx, { precioUnitario: e.target.value })} />
+                    <div className="item-precio">
+                      <input 
+                        className="modern-input" 
+                        type="number" 
+                        step="0.01" 
+                        min="0"
+                        value={it.precioUnitario} 
+                        onChange={(e) => updateItem(idx, { precioUnitario: e.target.value })}
+                        placeholder="Precio"
+                        required
+                      />
+                    </div>
 
-                  <input className="input" disabled value={it.subtotal || 0} />
+                    <div className="item-subtotal">
+                      <input 
+                        className="modern-input" 
+                        disabled 
+                        value={`$${it.subtotal || 0}`}
+                      />
+                    </div>
 
-                  <div style={{display:'flex', justifyContent:'flex-end'}}>
-                    <button type="button" onClick={() => removeItem(idx)} className="btn btn-ghost">Eliminar</button>
+                    <div className="item-actions">
+                      <button 
+                        type="button" 
+                        onClick={() => removeItem(idx)} 
+                        className="icon-btn delete"
+                        disabled={items.length === 1}
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
-            <div style={{marginTop:12}}>
-              <button type="button" onClick={addEmptyItem} className="btn btn-primary">Agregar item</button>
+            {/* Total */}
+            <div className="total-section">
+              <div className="total-amount">
+                <span className="total-label">Total de la Venta:</span>
+                <span className="total-value">${calcularTotal()}</span>
+              </div>
             </div>
           </div>
 
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:18}}>
-            <div style={{fontWeight:700, fontSize:18}}>Total: ${calcularTotal()}</div>
-            <div>
-              <button type="button" onClick={onClose} className="btn btn-ghost" style={{marginRight:8}}>Cancelar</button>
-              <button type="submit" className="btn btn-primary">Registrar Venta</button>
-            </div>
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn-primary">
+              Registrar Venta
+            </button>
           </div>
         </form>
       </div>

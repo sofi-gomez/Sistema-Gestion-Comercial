@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.OutputStream;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -40,6 +41,35 @@ public class RemitoService {
         return remitoRepository.findById(id);
     }
 
+    // --- NUEVO MÉTODO PARA ACTUALIZAR ---
+    @Transactional
+    public Remito actualizarRemito(Remito remito) {
+        // Verificar que el remito existe
+        Remito remitoExistente = remitoRepository.findById(remito.getId())
+                .orElseThrow(() -> new RuntimeException("Remito no encontrado"));
+
+        // Mantener el número original (no cambiar la numeración al actualizar)
+        remito.setNumero(remitoExistente.getNumero());
+
+        // Eliminar los items existentes antes de agregar los nuevos
+        remitoItemRepository.deleteByRemitoId(remito.getId());
+
+        // Asociar los nuevos items con el remito
+        if (remito.getItems() != null) {
+            for (RemitoItem item : remito.getItems()) {
+                item.setRemito(remito);
+                // Asegurar que el ID del item sea null para que se cree como nuevo
+                item.setId(null);
+            }
+        }
+
+        // Actualizar fecha de modificación
+        remito.preUpdate();
+
+        // Guardar el remito actualizado
+        return remitoRepository.save(remito);
+    }
+
     @Transactional
     public Remito generarRemito(Remito remito) {
         // numeración automática (similar a lo que hiciste para ventas)
@@ -60,10 +90,9 @@ public class RemitoService {
     }
     // -------------------------------------------------------
 
-    // Tu método para generar PDF (no lo toqué, sólo lo dejé público)
     public void generarPdfRemito(Remito remito, OutputStream os, byte[] logoBytes) throws Exception {
         try (PDDocument doc = new PDDocument()) {
-            PDPage page = new PDPage(PDRectangle.LETTER);
+            PDPage page = new PDPage(PDRectangle.A4);
             doc.addPage(page);
 
             PDPageContentStream cs = new PDPageContentStream(doc, page);
@@ -73,168 +102,227 @@ public class RemitoService {
             float x = margin;
             float y = h - margin;
 
-            // Logo
+            // Logo en esquina superior izquierda
             if (logoBytes != null) {
                 try {
                     PDImageXObject pdImage = PDImageXObject.createFromByteArray(doc, logoBytes, "logo");
-                    float logoW = 80;
-                    float logoH = 80;
+                    float logoW = 60;
+                    float logoH = 60;
                     cs.drawImage(pdImage, x, y - logoH, logoW, logoH);
-                } catch (Exception ex) { }
+                } catch (Exception ex) {
+                    // Continuar sin logo
+                }
             }
 
-            // Título REMITO y aclaración
-            float rightStart = w - margin;
+            // Título "REMITO" centrado
             cs.beginText();
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 26);
-            cs.newLineAtOffset(rightStart - 220, y - 10);
+            cs.setFont(PDType1Font.HELVETICA_BOLD, 24);
+            cs.newLineAtOffset(w/2 - 40, y - 30);
             cs.showText("REMITO");
             cs.endText();
 
+            // Número de remito
             cs.beginText();
-            cs.setFont(PDType1Font.HELVETICA_OBLIQUE, 10);
-            cs.newLineAtOffset(rightStart - 220, y - 40);
-            cs.showText("Documento no válido como factura");
+            cs.setFont(PDType1Font.HELVETICA_BOLD, 14);
+            cs.newLineAtOffset(w/2 - 20, y - 55);
+            cs.showText("N° " + remito.getNumero());
             cs.endText();
 
-            // Fecha
+            // Fecha alineada a la derecha
             String fecha = remito.getFecha() != null
                     ? remito.getFecha().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                     : LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
             cs.beginText();
             cs.setFont(PDType1Font.HELVETICA, 10);
-            cs.newLineAtOffset(rightStart - 220, y - 70);
+            cs.newLineAtOffset(w - margin - 80, y - 30);
             cs.showText("Fecha: " + fecha);
             cs.endText();
 
-            // Datos cliente
-            float clienteY = y - 120;
-            cs.setLineWidth(0.8f);
-            cs.moveTo(margin, clienteY + 18);
-            cs.lineTo(w - margin, clienteY + 18);
-            cs.stroke();
-
-            cs.beginText();
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 14);
-            cs.newLineAtOffset(margin, clienteY);
-            cs.showText("Datos del cliente:");
-            cs.endText();
-
-            // nombre / direccion / cp / aclaracion — leemos los campos que agregaste en Remito
-            float textY = clienteY - 18;
-            String clienteNombre = safeString(remito.getClienteNombre() != null ? remito.getClienteNombre() :
-                    (remito.getCliente() != null ? remito.getCliente().getNombre() : ""));
-            cs.beginText();
-            cs.setFont(PDType1Font.HELVETICA, 11);
-            cs.newLineAtOffset(margin, textY);
-            cs.showText(clienteNombre);
-            cs.endText();
-
-            textY -= 14;
-            String direccion = safeString(remito.getClienteDireccion());
-            cs.beginText();
-            cs.newLineAtOffset(margin, textY);
-            cs.showText(direccion);
-            cs.endText();
-
-            textY -= 14;
-            String cp = safeString(remito.getClienteCodigoPostal());
-            cs.beginText();
-            cs.newLineAtOffset(margin, textY);
-            cs.showText(cp);
-            cs.endText();
-
-            textY -= 14;
-            String aclar = safeString(remito.getClienteAclaracion());
-            if (aclar.isBlank()) aclar = "Consumidor final";
-            cs.beginText();
-            cs.newLineAtOffset(margin, textY);
-            cs.showText(aclar);
-            cs.endText();
-
-            // separador
-            float tableTop = textY - 28;
+            // Línea separadora después del header
+            y -= 80;
             cs.setLineWidth(1f);
-            cs.moveTo(margin, tableTop);
-            cs.lineTo(w - margin, tableTop);
+            cs.moveTo(x, y);
+            cs.lineTo(w - margin, y);
             cs.stroke();
 
-            // headers tabla CANT / DESCRIPCIÓN (estilo simple)
-            float tableY = tableTop - 20;
-            float colCantW = 60;
-            float colDescW = w - margin*2 - colCantW;
-
-            cs.addRect(margin, tableY + 6, w - margin * 2, 22);
-            cs.setNonStrokingColor(220/255f,220/255f,220/255f);
-            cs.fill();
-            cs.setNonStrokingColor(0,0,0);
-
+            // SECCIÓN DATOS DEL CLIENTE - Estilo tabla
+            y -= 30;
             cs.beginText();
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 11);
-            cs.newLineAtOffset(margin + 6, tableY + 12);
-            cs.showText("CANT.");
+            cs.setFont(PDType1Font.HELVETICA_BOLD, 12);
+            cs.newLineAtOffset(x, y);
+            cs.showText("DATOS DEL CLIENTE");
             cs.endText();
 
-            cs.beginText();
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 11);
-            cs.newLineAtOffset(margin + colCantW + 10, tableY + 12);
-            cs.showText("DESCRIPCION");
-            cs.endText();
+            // Información del cliente en formato de tabla limpia
+            float infoStartY = y - 25;
+            String[][] clienteData = {
+                    {"Nombre:", safeString(remito.getClienteNombre())},
+                    {"Dirección:", safeString(remito.getClienteDireccion())},
+                    {"Código Postal:", safeString(remito.getClienteCodigoPostal())},
+                    {"Condición IVA:", safeString(remito.getClienteAclaracion()).isEmpty() ?
+                            "Consumidor Final" : formatCondicionIva(remito.getClienteAclaracion())}
+            };
 
-            // filas items
-            float rowY = tableY - 10;
-            cs.setFont(PDType1Font.HELVETICA, 11);
-            if (remito.getItems() != null) {
-                for (RemitoItem it : remito.getItems()) {
-                    if (rowY < 100) {
-                        cs.close();
-                        page = new PDPage(PDRectangle.LETTER);
-                        doc.addPage(page);
-                        cs = new PDPageContentStream(doc, page);
-                        rowY = page.getMediaBox().getHeight() - margin - 40;
-                    }
+            float labelX = x;
+            float valueX = x + 100;
 
+            for (String[] data : clienteData) {
+                if (!data[1].isEmpty()) {
+                    // Label
                     cs.beginText();
-                    cs.newLineAtOffset(margin + 6, rowY);
-                    String cant = it.getCantidad() != null ? it.getCantidad().toString() : "0";
-                    cs.showText(cant);
+                    cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
+                    cs.newLineAtOffset(labelX, infoStartY);
+                    cs.showText(data[0]);
                     cs.endText();
 
-                    String desc = (it.getProducto() != null && it.getProducto().getNombre() != null)
-                            ? it.getProducto().getNombre() : safeString(it.getNotas());
-                    if (desc.length() > 90) desc = desc.substring(0, 87) + "...";
+                    // Value
                     cs.beginText();
-                    cs.newLineAtOffset(margin + colCantW + 6, rowY);
-                    cs.showText(desc);
+                    cs.setFont(PDType1Font.HELVETICA, 10);
+                    cs.newLineAtOffset(valueX, infoStartY);
+                    cs.showText(data[1]);
                     cs.endText();
 
-                    rowY -= 18;
+                    infoStartY -= 18;
                 }
             }
 
-            // Observaciones
-            float obsY = rowY - 20;
+            // Línea separadora antes de la tabla de items
+            infoStartY -= 15;
+            cs.setLineWidth(0.5f);
+            cs.moveTo(x, infoStartY);
+            cs.lineTo(w - margin, infoStartY);
+            cs.stroke();
+
+            // TABLA DE ITEMS - Estilo profesional
+            float tableTop = infoStartY - 20;
+
+            // Header de la tabla
+            cs.setNonStrokingColor(240/255f, 240/255f, 240/255f);
+            cs.addRect(x, tableTop - 25, w - 2 * margin, 25);
+            cs.fill();
+            cs.setNonStrokingColor(0, 0, 0);
+
+            // Bordes del header
+            cs.setLineWidth(0.5f);
+            cs.addRect(x, tableTop - 25, w - 2 * margin, 25);
+            cs.stroke();
+
+            // Columnas
+            float colCantX = x + 10;
+            float colDescX = x + 80;
+
+            // Títulos de columnas
+            cs.beginText();
+            cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
+            cs.newLineAtOffset(colCantX, tableTop - 15);
+            cs.showText("CANTIDAD");
+            cs.endText();
+
+            cs.beginText();
+            cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
+            cs.newLineAtOffset(colDescX, tableTop - 15);
+            cs.showText("DESCRIPCIÓN");
+            cs.endText();
+
+            // Filas de items
+            float rowY = tableTop - 30;
+            if (remito.getItems() != null && !remito.getItems().isEmpty()) {
+                for (RemitoItem it : remito.getItems()) {
+                    // Fila con borde sutil
+                    cs.setLineWidth(0.2f);
+                    cs.addRect(x, rowY - 20, w - 2 * margin, 20);
+                    cs.stroke();
+
+                    // Cantidad
+                    String cantidad = formatCantidad(it.getCantidad());
+                    cs.beginText();
+                    cs.setFont(PDType1Font.HELVETICA, 10);
+                    cs.newLineAtOffset(colCantX, rowY - 15);
+                    cs.showText(cantidad);
+                    cs.endText();
+
+                    // Descripción
+                    String desc = (it.getProducto() != null && it.getProducto().getNombre() != null)
+                            ? it.getProducto().getNombre() : safeString(it.getNotas());
+                    cs.beginText();
+                    cs.setFont(PDType1Font.HELVETICA, 10);
+                    cs.newLineAtOffset(colDescX, rowY - 15);
+                    cs.showText(desc);
+                    cs.endText();
+
+                    rowY -= 22;
+
+                    // Verificar si necesita nueva página
+                    if (rowY < 150) {
+                        cs.close();
+                        page = new PDPage(PDRectangle.A4);
+                        doc.addPage(page);
+                        cs = new PDPageContentStream(doc, page);
+                        rowY = h - margin - 40;
+                        x = margin;
+                    }
+                }
+            }
+
+            // SECCIÓN INFERIOR - Diseño limpio
+            float bottomY = Math.max(rowY - 30, 180);
+
+            // Observaciones (si existen)
+            String observaciones = safeString(remito.getObservaciones());
+            if (!observaciones.isEmpty()) {
+                cs.beginText();
+                cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
+                cs.newLineAtOffset(x, bottomY);
+                cs.showText("Observaciones:");
+                cs.endText();
+
+                bottomY -= 15;
+                String[] obsLines = splitText(observaciones, 80);
+                cs.setFont(PDType1Font.HELVETICA, 9);
+                for (String line : obsLines) {
+                    cs.beginText();
+                    cs.newLineAtOffset(x, bottomY);
+                    cs.showText("• " + line);
+                    cs.endText();
+                    bottomY -= 12;
+                }
+                bottomY -= 10;
+            }
+
+            // Línea separadora antes del total
+            cs.setLineWidth(0.5f);
+            cs.moveTo(x, bottomY);
+            cs.lineTo(w - margin, bottomY);
+            cs.stroke();
+
+            // Total a pagar - diseño simple
+            bottomY -= 25;
             cs.beginText();
             cs.setFont(PDType1Font.HELVETICA_BOLD, 11);
-            cs.newLineAtOffset(margin, obsY);
-            cs.showText("Observaciones:");
+            cs.newLineAtOffset(x, bottomY);
+            cs.showText("TOTAL A PAGAR: $ ___________________");
             cs.endText();
 
-            obsY -= 14;
+            // Firma - alineada a la derecha
+            bottomY -= 30;
+            float firmaX = w - margin - 150;
             cs.beginText();
             cs.setFont(PDType1Font.HELVETICA, 10);
-            cs.newLineAtOffset(margin, obsY);
-            String obs = safeString(remito.getObservaciones());
-            if (obs.length() > 400) obs = obs.substring(0, 397) + "...";
-            cs.showText(obs);
+            cs.newLineAtOffset(firmaX, bottomY);
+            cs.showText("Firma:");
             cs.endText();
 
-            // aclaración final
-            obsY -= 18;
+            // Línea para firma
+            cs.setLineWidth(0.8f);
+            cs.moveTo(firmaX + 30, bottomY - 2);
+            cs.lineTo(firmaX + 150, bottomY - 2);
+            cs.stroke();
+
+            // Aclaración final centrada
             cs.beginText();
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 9);
-            cs.newLineAtOffset(margin, obsY);
-            cs.showText("PRECIOS EN PESOS SIN IVA");
+            cs.setFont(PDType1Font.HELVETICA_BOLD, 8);
+            cs.newLineAtOffset(w/2 - 120, 40);
+            cs.showText("PRECIOS EN PESOS ARGENTINOS - DOCUMENTO NO VÁLIDO COMO FACTURA");
             cs.endText();
 
             cs.close();
@@ -242,7 +330,59 @@ public class RemitoService {
         }
     }
 
-    // helpers
+    // Método helper para formatear la condición de IVA
+    private String formatCondicionIva(String condicionIva) {
+        if (condicionIva == null || condicionIva.isEmpty()) {
+            return "Consumidor Final";
+        }
+
+        switch (condicionIva.toUpperCase()) {
+            case "CONSUMIDOR_FINAL":
+                return "Consumidor Final";
+            case "RESPONSABLE_INSCRIPTO":
+                return "Responsable Inscripto";
+            case "MONOTRIBUTO":
+                return "Monotributista";
+            case "EXENTO":
+                return "Exento";
+            case "NO_RESPONSABLE":
+                return "No Responsable";
+            default:
+                return condicionIva;
+        }
+    }
+
+    // Método helper para formatear cantidades
+    private String formatCantidad(BigDecimal cantidad) {
+        if (cantidad == null) return "0";
+        if (cantidad.stripTrailingZeros().scale() <= 0) {
+            return cantidad.toBigInteger().toString();
+        }
+        return cantidad.setScale(2, java.math.RoundingMode.HALF_UP).toString();
+    }
+
+    // Método helper para dividir texto en líneas
+    private String[] splitText(String text, int maxLength) {
+        if (text.length() <= maxLength) {
+            return new String[]{text};
+        }
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        int start = 0;
+        while (start < text.length()) {
+            int end = Math.min(start + maxLength, text.length());
+            if (end < text.length()) {
+                int lastSpace = text.lastIndexOf(' ', end);
+                if (lastSpace > start) {
+                    end = lastSpace;
+                }
+            }
+            lines.add(text.substring(start, end).trim());
+            start = end;
+        }
+        return lines.toArray(new String[0]);
+    }
+
+    // Helper para strings seguros
     private String safeString(String s) {
         return s == null ? "" : s;
     }

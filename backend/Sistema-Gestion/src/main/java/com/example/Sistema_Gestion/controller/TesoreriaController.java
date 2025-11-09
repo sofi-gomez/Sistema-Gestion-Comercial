@@ -22,7 +22,7 @@ public class TesoreriaController {
         return tesoreriaService.listarTodos();
     }
 
-    @PostMapping("/movimientos")
+    @PostMapping
     public MovimientoTesoreria registrarMovimiento(@RequestBody MovimientoTesoreria movimiento) {
         return tesoreriaService.registrarMovimiento(movimiento);
     }

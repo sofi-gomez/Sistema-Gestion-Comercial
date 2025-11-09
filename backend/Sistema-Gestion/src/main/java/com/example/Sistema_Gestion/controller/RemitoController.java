@@ -3,14 +3,11 @@ package com.example.Sistema_Gestion.controller;
 import com.example.Sistema_Gestion.model.Remito;
 import com.example.Sistema_Gestion.service.RemitoService;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
@@ -36,10 +33,35 @@ public class RemitoController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // Agrega este método POST para crear nuevos remitos
     @PostMapping
-    public ResponseEntity<?> generarRemito(@RequestBody Remito remito) {
-        Remito creado = remitoService.generarRemito(remito);
-        return ResponseEntity.ok(creado);
+    public ResponseEntity<?> crearRemito(@RequestBody Remito remito) {
+        try {
+            Remito creado = remitoService.generarRemito(remito);
+            return ResponseEntity.ok(creado);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al crear remito: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> actualizarRemito(@PathVariable Long id, @RequestBody Remito remito) {
+        // Verificar que el remito existe
+        if (!remitoService.buscarPorId(id).isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // Asegurar que el ID del path coincide con el ID del objeto
+        remito.setId(id);
+
+        try {
+            Remito actualizado = remitoService.actualizarRemito(remito);
+            return ResponseEntity.ok(actualizado);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al actualizar remito: " + e.getMessage());
+        }
     }
 
     @GetMapping("/{id}/pdf")
@@ -58,5 +80,4 @@ public class RemitoController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error generando PDF", e);
         }
     }
-
 }

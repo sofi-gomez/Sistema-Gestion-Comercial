@@ -1,5 +1,6 @@
-// src/components/RemitoFormModal.js
 import React, { useEffect, useState } from "react";
+import { FiPlus, FiTrash2 } from "react-icons/fi";
+import "../index.css";
 
 export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
   const [form, setForm] = useState({
@@ -17,6 +18,18 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
   const [proveedores, setProveedores] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Opciones predefinidas para el combo box de IVA
+  const ivaOptions = [
+    { value: "", label: "-- Seleccionar condición de IVA --" },
+    { value: "CONSUMIDOR_FINAL", label: "Consumidor Final" },
+    { value: "RESPONSABLE_INSCRIPTO", label: "Responsable Inscripto" },
+    { value: "MONOTRIBUTO", label: "Monotributo" },
+    { value: "EXENTO", label: "Exento" },
+    { value: "NO_RESPONSABLE", label: "No Responsable" },
+    { value: "OTRO", label: "Otro" }
+  ];
 
   const API_PRODUCTS = "http://localhost:8080/api/productos";
   const API_REMITOS = "http://localhost:8080/api/remitos";
@@ -24,10 +37,29 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
   const API_CLIENTES = "http://localhost:8080/api/clientes";
 
   useEffect(() => {
-    // cargar auxiliares (silencioso si falla)
-    fetch(API_PRODUCTS).then(r => r.ok ? r.json() : []).then(setProductos).catch(()=>{});
-    fetch(API_PROVEEDORES).then(r => r.ok ? r.json() : []).then(setProveedores).catch(()=>{});
-    fetch(API_CLIENTES).then(r => r.ok ? r.json() : []).then(setClientes).catch(()=>{});
+    const loadData = async () => {
+      try {
+        const [productsRes, providersRes, clientsRes] = await Promise.all([
+          fetch(API_PRODUCTS),
+          fetch(API_PROVEEDORES),
+          fetch(API_CLIENTES)
+        ]);
+
+        const productsData = productsRes.ok ? await productsRes.json() : [];
+        const providersData = providersRes.ok ? await providersRes.json() : [];
+        const clientsData = clientsRes.ok ? await clientsRes.json() : [];
+
+        setProductos(productsData);
+        setProveedores(providersData);
+        setClientes(clientsData);
+      } catch (error) {
+        console.error("Error cargando datos:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
 
     if (remito) {
       setForm({
@@ -57,11 +89,13 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
         items: [{ producto: null, cantidad: 1, notas: "" }]
       }));
     }
-    // eslint-disable-next-line
   }, [remito]);
 
   const addItem = () => {
-    setForm(prev => ({ ...prev, items: [...prev.items, { producto: null, cantidad: 1,notas: "" }] }));
+    setForm(prev => ({ 
+      ...prev, 
+      items: [...prev.items, { producto: null, cantidad: 1, notas: "" }] 
+    }));
   };
 
   const removeItem = (index) => {
@@ -87,17 +121,27 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
 
   const handleClienteChange = (id) => {
     const c = clientes.find(x => String(x.id) === String(id)) || null;
-    setForm(prev => ({ ...prev, cliente: c, clienteNombre: c ? c.nombre : prev.clienteNombre }));
+    setForm(prev => ({ 
+      ...prev, 
+      cliente: c, 
+      clienteNombre: c ? c.nombre : prev.clienteNombre 
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.items || form.items.length === 0) return alert("Agregá al menos un item.");
+    
+    if (!form.items || form.items.length === 0) {
+      return alert("Agregá al menos un item.");
+    }
+    
     for (const it of form.items) {
       if (!it.producto || !(it.producto.id || it.producto === 0)) {
         return alert("Cada item debe tener un producto seleccionado.");
       }
-      if (!it.cantidad || Number(it.cantidad) <= 0) return alert("Cantidad inválida en un item.");
+      if (!it.cantidad || Number(it.cantidad) <= 0) {
+        return alert("Cantidad inválida en un item.");
+      }
     }
 
     const payload = {
@@ -124,10 +168,12 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+      
       if (!res.ok) {
         const txt = await res.text();
         throw new Error(txt || "Error guardando remito");
       }
+      
       onSaved && onSaved();
     } catch (err) {
       console.error(err);
@@ -137,99 +183,170 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
     }
   };
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-          <h3 style={{ margin: 0 }}>{remito ? `Editar Remito #${remito.numero}` : "Nuevo Remito"}</h3>
-          <div>
-            <button onClick={onClose} className="btn">Cerrar</button>
+  if (loading) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal-card">
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            <p>Cargando datos...</p>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        <form onSubmit={handleSubmit} style={{ marginTop: 14 }}>
-          <div className="form-grid">
-            <div>
-              <label className="form-label">Proveedor (opcional)</label>
-              <select className="input" value={form.proveedor?.id || ""} onChange={e => handleProveedorChange(e.target.value)}>
-                <option value="">-- Sin proveedor --</option>
-                {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-              </select>
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1000 }}>
+        <div className="modal-header">
+          <h2>{remito ? `Editar Remito #${remito.numero}` : "Nuevo Remito"}</h2>
+          <button onClick={onClose} className="modal-close">×</button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="modal-content">
+            <div className="form-grid">
+
+              <div className="form-group full-width">
+                <label className="form-label">Nombre cliente</label>
+                <input 
+                  className="modern-input" 
+                  value={form.clienteNombre || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, clienteNombre: e.target.value }))} 
+                  placeholder="Nombre del cliente"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Dirección</label>
+                <input 
+                  className="modern-input" 
+                  value={form.clienteDireccion || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, clienteDireccion: e.target.value }))}
+                  placeholder="Dirección del cliente"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Código postal</label>
+                <input 
+                  className="modern-input" 
+                  value={form.clienteCodigoPostal || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, clienteCodigoPostal: e.target.value }))}
+                  placeholder="Código postal"
+                />
+              </div>
+
+              <div className="form-group full-width">
+                <label className="form-label">Condición de IVA</label>
+                <select 
+                  className="modern-input" 
+                  value={form.clienteAclaracion || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, clienteAclaracion: e.target.value }))}
+                >
+                  {ivaOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group full-width">
+                <label className="form-label">Observaciones</label>
+                <textarea 
+                  className="modern-textarea" 
+                  value={form.observaciones} 
+                  onChange={e => setForm(prev => ({ ...prev, observaciones: e.target.value }))}
+                  placeholder="Observaciones adicionales"
+                  rows="3"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="form-label">Cliente (opcional)</label>
-              <select className="input" value={form.cliente?.id || ""} onChange={e => handleClienteChange(e.target.value)}>
-                <option value="">-- Sin cliente --</option>
-                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-              </select>
-            </div>
+            {/* Items del remito */}
+            <div className="form-group full-width">
+              <div className="items-header">
+                <label className="form-label">Items del Remito</label>
+              </div>
 
-            <div className="form-row-single">
-              <label className="form-label">Nombre cliente (si querés editar / cargar manual)</label>
-              <input className="input" value={form.clienteNombre || ""} onChange={e => setForm(prev => ({ ...prev, clienteNombre: e.target.value }))} />
-            </div>
+              <div className="items-container">
+                {form.items.map((it, idx) => (
+                  <div key={idx} className="item-row">
+                    <div className="item-producto">
+                      <select 
+                        className="modern-input" 
+                        value={it.producto?.id || ""} 
+                        onChange={e => {
+                          const pid = e.target.value;
+                          const prod = productos.find(p => String(p.id) === String(pid)) || { id: pid };
+                          updateItem(idx, "producto", prod);
+                        }}
+                        required
+                      >
+                        <option value="">-- Seleccionar producto --</option>
+                        {productos.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} {p.sku ? `(${p.sku})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-            <div>
-              <label className="form-label">Dirección</label>
-              <input className="input" value={form.clienteDireccion || ""} onChange={e => setForm(prev => ({ ...prev, clienteDireccion: e.target.value }))} />
-            </div>
+                    <div className="item-cantidad">
+                      <input 
+                        className="modern-input" 
+                        type="number" 
+                        step="0.0001"
+                        min="0.0001"
+                        value={it.cantidad} 
+                        onChange={e => updateItem(idx, "cantidad", e.target.value)}
+                        placeholder="Cantidad"
+                        required
+                      />
+                    </div>
 
-            <div>
-              <label className="form-label">Código postal</label>
-              <input className="input" value={form.clienteCodigoPostal || ""} onChange={e => setForm(prev => ({ ...prev, clienteCodigoPostal: e.target.value }))} />
-            </div>
+                    <div className="item-notas">
+                      <input 
+                        className="modern-input" 
+                        value={it.notas} 
+                        onChange={e => updateItem(idx, "notas", e.target.value)}
+                        placeholder="Notas (opcional)"
+                      />
+                    </div>
 
-            <div className="form-row-single">
-              <label className="form-label">Condicion de IVA (ej: Consumidor final)</label>
-              <input className="input" value={form.clienteAclaracion || ""} onChange={e => setForm(prev => ({ ...prev, clienteAclaracion: e.target.value }))} />
-            </div>
-
-            <div className="form-row-single">
-              <label className="form-label">Observaciones</label>
-              <textarea className="input textarea" value={form.observaciones} onChange={e => setForm(prev => ({ ...prev, observaciones: e.target.value }))} />
-            </div>
-          </div>
-
-          <div style={{ marginTop: 12 }}>
-            <h4 className="card-title" style={{ fontSize: 16, marginBottom: 8 }}>Items</h4>
-            <div className="space-y-3">
-              {form.items.map((it, idx) => (
-                <div key={idx} className="grid" style={{ gridTemplateColumns: 'repeat(12, 1fr)', gap: 8, alignItems: 'center' }}>
-                  <div style={{ gridColumn: 'span 5' }}>
-                    <label className="form-label">Producto</label>
-                    <select className="input" value={it.producto?.id || ""} onChange={e => {
-                      const pid = e.target.value;
-                      const prod = productos.find(p => String(p.id) === String(pid)) || { id: pid };
-                      updateItem(idx, "producto", prod);
-                    }}>
-                      <option value="">-- seleccionar producto --</option>
-                      {productos.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.sku || ""})</option>)}
-                    </select>
+                    <div className="item-actions">
+                      <button 
+                        type="button" 
+                        onClick={() => removeItem(idx)} 
+                        className="icon-btn delete"
+                        disabled={form.items.length === 1}
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </div>
                   </div>
-
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label className="form-label">Cantidad</label>
-                    <input className="input" type="number" step="0.0001" value={it.cantidad} onChange={e => updateItem(idx, "cantidad", e.target.value)} />
-                  </div>
-
-
-                  <div style={{ gridColumn: 'span 1', textAlign: 'right' }}>
-                    <label style={{ visibility: 'hidden' }}>X</label>
-                    <button type="button" onClick={() => removeItem(idx)} className="btn" style={{ background: 'transparent', color: '#ef4444' }}>Eliminar</button>
-                  </div>
+                ))}
+                
+                {/* Botón Agregar Item debajo de la lista */}
+                <div className="add-item-container">
+                  <button type="button" onClick={addItem} className="btn-primary full-width">
+                    <FiPlus />
+                    Agregar Item
+                  </button>
                 </div>
-              ))}
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <button type="button" onClick={addItem} className="btn">Agregar item</button>
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 18 }}>
-            <button type="button" onClick={onClose} className="btn">Cancelar</button>
-            <button type="submit" disabled={saving} className="btn btn-primary">{saving ? "Guardando..." : "Guardar Remito"}</button>
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>
+              Cancelar
+            </button>
+            <button type="submit" disabled={saving} className="btn-primary">
+              {saving ? "Guardando..." : (remito ? "Actualizar Remito" : "Crear Remito")}
+            </button>
           </div>
         </form>
       </div>

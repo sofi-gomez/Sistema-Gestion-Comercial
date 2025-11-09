@@ -25,6 +25,14 @@ public class Venta {
 
     private String estado;
 
+    // En la entidad Venta.java, agrega:
+    @Column(name = "medio_pago")
+    private String medioPago;
+
+    // Con su getter y setter
+    public String getMedioPago() { return medioPago; }
+    public void setMedioPago(String medioPago) { this.medioPago = medioPago; }
+
     @OneToMany(mappedBy="venta", cascade=CascadeType.ALL, orphanRemoval=true)
     @JsonManagedReference
     private List<VentaItem> items;

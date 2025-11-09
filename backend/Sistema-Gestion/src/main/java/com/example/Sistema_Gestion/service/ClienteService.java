@@ -5,6 +5,7 @@ import com.example.Sistema_Gestion.repository.ClienteRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ClienteService {
@@ -19,6 +20,10 @@ public class ClienteService {
         return clienteRepository.findAll();
     }
 
+    public Optional<Cliente> buscarPorId(Long id) {
+        return clienteRepository.findById(id);
+    }
+
     public Cliente guardar(Cliente cliente) {
         return clienteRepository.save(cliente);
     }
@@ -26,11 +31,14 @@ public class ClienteService {
     public Cliente actualizar(Long id, Cliente cliente) {
         Cliente existente = clienteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+
         existente.setNombre(cliente.getNombre());
         existente.setDocumento(cliente.getDocumento());
         existente.setTelefono(cliente.getTelefono());
         existente.setEmail(cliente.getEmail());
+        existente.setDireccion(cliente.getDireccion()); // Agregar esta línea
         existente.setNotas(cliente.getNotas());
+
         return clienteRepository.save(existente);
     }
 
@@ -38,4 +46,3 @@ public class ClienteService {
         clienteRepository.deleteById(id);
     }
 }
-
