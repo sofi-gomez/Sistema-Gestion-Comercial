@@ -35,6 +35,13 @@ public class Producto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    private Boolean eliminado = false;
+
+    // getters y setters
+    public Boolean getEliminado() { return eliminado; }
+    public void setEliminado(Boolean eliminado) { this.eliminado = eliminado; }
+
+
     @PrePersist
     public void prePersist() {
         createdAt = LocalDateTime.now();

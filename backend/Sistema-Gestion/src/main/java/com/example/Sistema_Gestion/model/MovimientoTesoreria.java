@@ -1,91 +1,118 @@
 package com.example.Sistema_Gestion.model;
+
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name="movimiento_tesoreria")
+@Table(name = "movimiento_tesoreria")
 public class MovimientoTesoreria {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    public enum TipoMovimiento {
+        INGRESO, EGRESO
+    }
+
+    public enum MedioPago {
+        EFECTIVO, TRANSFERENCIA, TARJETA_DEBITO, TARJETA_CREDITO, CHEQUE, MERCADO_PAGO
+    }
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private LocalDateTime fecha;
-    @Enumerated(EnumType.STRING)
-    private TipoMovimiento tipo;
+    // Si el tipo es ENUM en la BD pero VARCHAR en el código, usa String temporalmente
+    @Column(nullable = false)
+    private String tipo;
+
+    @Column(name = "medio_pago", nullable = false)
     private String medioPago;
-    @Column(precision=14, scale=2)
+
+    @Column(precision = 10, scale = 2, nullable = false)
     private BigDecimal importe;
-    @Column(columnDefinition="TEXT")
-    private String descripcion;
+
     private String referencia;
+
+    @Column(columnDefinition = "TEXT")
+    private String descripcion;
+
+    @Column(nullable = false)
+    private LocalDateTime fecha;
+
+    // Usar los nombres exactos que existen en la BD
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    public enum TipoMovimiento { INGRESO, EGRESO }
-    @PrePersist public void prePersist(){ fecha = LocalDateTime.now(); createdAt = LocalDateTime.now(); }
-    // getters/setters
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
+    @PrePersist
+    protected void onCreate() {
+        if (fecha == null) {
+            fecha = LocalDateTime.now();
+        }
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 
-    public String getDescripcion() {
-        return descripcion;
+    // Métodos helper para trabajar con enums de forma segura
+    public TipoMovimiento getTipoEnum() {
+        try {
+            return TipoMovimiento.valueOf(this.tipo);
+        } catch (IllegalArgumentException e) {
+            return TipoMovimiento.INGRESO; // Valor por defecto
+        }
     }
 
-    public void setDescripcion(String descripcion) {
-        this.descripcion = descripcion;
+    public void setTipoEnum(TipoMovimiento tipo) {
+        this.tipo = tipo.name();
     }
 
-    public LocalDateTime getFecha() {
-        return fecha;
+    public MedioPago getMedioPagoEnum() {
+        try {
+            return MedioPago.valueOf(this.medioPago);
+        } catch (IllegalArgumentException e) {
+            return MedioPago.EFECTIVO; // Valor por defecto
+        }
     }
 
-    public void setFecha(LocalDateTime fecha) {
-        this.fecha = fecha;
+    public void setMedioPagoEnum(MedioPago medioPago) {
+        this.medioPago = medioPago.name();
     }
 
-    public Long getId() {
-        return id;
-    }
+    // Getters y Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public String getTipo() { return tipo; }
+    public void setTipo(String tipo) { this.tipo = tipo; }
 
-    public BigDecimal getImporte() {
-        return importe;
-    }
+    public String getMedioPago() { return medioPago; }
+    public void setMedioPago(String medioPago) { this.medioPago = medioPago; }
 
-    public void setImporte(BigDecimal importe) {
-        this.importe = importe;
-    }
+    public BigDecimal getImporte() { return importe; }
+    public void setImporte(BigDecimal importe) { this.importe = importe; }
 
-    public String getMedioPago() {
-        return medioPago;
-    }
+    public String getReferencia() { return referencia; }
+    public void setReferencia(String referencia) { this.referencia = referencia; }
 
-    public void setMedioPago(String medioPago) {
-        this.medioPago = medioPago;
-    }
+    public String getDescripcion() { return descripcion; }
+    public void setDescripcion(String descripcion) { this.descripcion = descripcion; }
 
-    public String getReferencia() {
-        return referencia;
-    }
+    public LocalDateTime getFecha() { return fecha; }
+    public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
 
-    public void setReferencia(String referencia) {
-        this.referencia = referencia;
-    }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    public TipoMovimiento getTipo() {
-        return tipo;
-    }
-
-    public void setTipo(TipoMovimiento tipo) {
-        this.tipo = tipo;
-    }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

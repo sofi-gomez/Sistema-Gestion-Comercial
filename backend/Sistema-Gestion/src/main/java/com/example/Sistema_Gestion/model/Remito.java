@@ -1,15 +1,17 @@
 package com.example.Sistema_Gestion.model;
 
-
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name="remito")
 public class Remito {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false, unique = true)
@@ -17,95 +19,77 @@ public class Remito {
 
     private LocalDateTime fecha;
 
-    @ManyToOne
-    @JoinColumn(name="proveedor_id")
-    private Proveedor proveedor;
+    // Campos para cliente manual
+    @Column(name="cliente_nombre")
+    private String clienteNombre;
 
-    @ManyToOne
-    @JoinColumn(name="cliente_id")
-    private Cliente cliente;
+    @Column(name="cliente_direccion")
+    private String clienteDireccion;
+
+    @Column(name="cliente_codigo_postal")
+    private String clienteCodigoPostal;
+
+    @Column(name="cliente_aclaracion")
+    private String clienteAclaracion;
 
     @Column(columnDefinition="TEXT")
     private String observaciones;
 
     @OneToMany(mappedBy="remito", cascade=CascadeType.ALL, orphanRemoval=true)
-    private java.util.List<RemitoItem> items;
+    @JsonManagedReference
+    private List<RemitoItem> items = new ArrayList<>();
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    @PrePersist public void prePersist(){ fecha = LocalDateTime.now(); createdAt=updatedAt=LocalDateTime.now();}
-    @PreUpdate public void preUpdate(){ updatedAt=LocalDateTime.now();}
-    // getters/setters
 
-
-    public Cliente getCliente() {
-        return cliente;
+    @PrePersist
+    public void prePersist(){
+        fecha = LocalDateTime.now();
+        createdAt = updatedAt = LocalDateTime.now();
     }
 
-    public void setCliente(Cliente cliente) {
-        this.cliente = cliente;
+    @PreUpdate
+    public void preUpdate(){
+        updatedAt = LocalDateTime.now();
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
+    // Getters y Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
+    public Long getNumero() { return numero; }
+    public void setNumero(Long numero) { this.numero = numero; }
 
-    public LocalDateTime getFecha() {
-        return fecha;
-    }
+    public LocalDateTime getFecha() { return fecha; }
+    public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
 
-    public void setFecha(LocalDateTime fecha) {
-        this.fecha = fecha;
-    }
+    public String getClienteNombre() { return clienteNombre; }
+    public void setClienteNombre(String clienteNombre) { this.clienteNombre = clienteNombre; }
 
-    public Long getId() {
-        return id;
-    }
+    public String getClienteDireccion() { return clienteDireccion; }
+    public void setClienteDireccion(String clienteDireccion) { this.clienteDireccion = clienteDireccion; }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public String getClienteCodigoPostal() { return clienteCodigoPostal; }
+    public void setClienteCodigoPostal(String clienteCodigoPostal) { this.clienteCodigoPostal = clienteCodigoPostal; }
 
-    public List<RemitoItem> getItems() {
-        return items;
-    }
+    public String getClienteAclaracion() { return clienteAclaracion; }
+    public void setClienteAclaracion(String clienteAclaracion) { this.clienteAclaracion = clienteAclaracion; }
 
-    public void setItems(List<RemitoItem> items) {
-        this.items = items;
-    }
+    public String getObservaciones() { return observaciones; }
+    public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
 
-    public Long getNumero() {
-        return numero;
-    }
+    public List<RemitoItem> getItems() { return items; }
+    public void setItems(List<RemitoItem> items) { this.items = items; }
 
-    public void setNumero(Long numero) {
-        this.numero = numero;
-    }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    public String getObservaciones() {
-        return observaciones;
-    }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 
-    public void setObservaciones(String observaciones) {
-        this.observaciones = observaciones;
-    }
-
-    public Proveedor getProveedor() {
-        return proveedor;
-    }
-
-    public void setProveedor(Proveedor proveedor) {
-        this.proveedor = proveedor;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
+    public void addItem(RemitoItem item) {
+        if (items == null) items = new ArrayList<>();
+        items.add(item);
+        item.setRemito(this);
     }
 }

@@ -17,10 +17,6 @@ public class ProductoService {
         this.productoRepository = productoRepository;
     }
 
-    public List<Producto> listarTodos() {
-        return productoRepository.findAll();
-    }
-
     public Optional<Producto> buscarPorId(Long id) {
         return productoRepository.findById(id);
     }
@@ -43,10 +39,6 @@ public class ProductoService {
         return productoRepository.save(existente);
     }
 
-    public void eliminar(Long id) {
-        productoRepository.deleteById(id);
-    }
-
     public void aumentarStock(Long productoId, Double cantidad) {
         Producto p = productoRepository.findById(productoId)
                 .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
@@ -63,6 +55,33 @@ public class ProductoService {
         p.setStock(p.getStock().subtract(BigDecimal.valueOf(cantidad)));
 
         productoRepository.save(p);
+    }
+
+    public void eliminar(Long id) {
+        Producto producto = productoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+
+        // Verificar si el producto tiene movimientos
+        if (tieneMovimientos(id)) {
+            // Eliminación lógica
+            producto.setEliminado(true);
+            producto.setActivo(false);
+            productoRepository.save(producto);
+        } else {
+            // Eliminación física solo si no tiene movimientos
+            productoRepository.deleteById(id);
+        }
+    }
+
+    private boolean tieneMovimientos(Long productoId) {
+        // Implementa esta lógica según tus relaciones
+        // Por ejemplo, verificar si hay ventas, remitos, etc. con este producto
+        return false; // Cambiar por la lógica real
+    }
+
+    // Modifica el método listarTodos para excluir eliminados
+    public List<Producto> listarTodos() {
+        return productoRepository.findByEliminadoFalse();
     }
 }
 
