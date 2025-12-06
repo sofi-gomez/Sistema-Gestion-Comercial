@@ -137,6 +137,7 @@ export default function VentaFormModal({ onClose, onSaved }) {
                 <option value="TARJETA_CREDITO">Tarjeta Crédito</option>
                 <option value="MERCADO_PAGO">Mercado Pago</option>
                 <option value="CHEQUE">Cheque</option>
+                  <option value="CHEQUE_ELECTRÓNICO">Cheque Electrónico</option>
               </select>
             </div>
 
