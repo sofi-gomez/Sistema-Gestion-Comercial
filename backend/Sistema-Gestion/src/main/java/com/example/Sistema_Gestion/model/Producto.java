@@ -1,7 +1,9 @@
 package com.example.Sistema_Gestion.model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;      // ← AGREGAR ESTA IMPORTACIÓN
 import java.time.LocalDateTime;
 
 @Entity
@@ -32,6 +34,11 @@ public class Producto {
     private String unidadMedida;
     private Boolean activo = true;
 
+    // ← AGREGAR ESTE CAMPO AQUÍ
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @Column(name = "fecha_vencimiento")
+    private LocalDate fechaVencimiento;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -53,7 +60,6 @@ public class Producto {
     }
 
     //getters and setters
-
 
     public Boolean getActivo() {
         return activo;
@@ -77,6 +83,15 @@ public class Producto {
 
     public void setDescripcion(String descripcion) {
         this.descripcion = descripcion;
+    }
+
+    // ← AGREGAR ESTOS GETTER Y SETTER AQUÍ
+    public LocalDate getFechaVencimiento() {
+        return fechaVencimiento;
+    }
+
+    public void setFechaVencimiento(LocalDate fechaVencimiento) {
+        this.fechaVencimiento = fechaVencimiento;
     }
 
     public Long getId() {

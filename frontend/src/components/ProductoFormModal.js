@@ -2,32 +2,7 @@ import React, { useState, useEffect } from "react";
 import "../index.css";
 
 export default function ProductoFormModal({ producto, onClose, onSave }) {
-  const [form, setForm] = useState({
-    sku: "",
-    nombre: "",
-    descripcion: "",
-    precioCosto: "",
-    precioVenta: "",
-    stock: "",
-    unidadMedida: "",
-    activo: true,
-  });
-
-  useEffect(() => {
-    if (producto) {
-      setForm({
-        sku: producto.sku || "",
-        nombre: producto.nombre || "",
-        descripcion: producto.descripcion || "",
-        precioCosto: producto.precioCosto?.toString() || "",
-        precioVenta: producto.precioVenta?.toString() || "",
-        stock: producto.stock?.toString() || "",
-        unidadMedida: producto.unidadMedida || "",
-        activo: producto.activo ?? true,
-      });
-    } else {
-      // Reset form for new product
-      setForm({
+    const [form, setForm] = useState({
         sku: "",
         nombre: "",
         descripcion: "",
@@ -36,158 +11,201 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
         stock: "",
         unidadMedida: "",
         activo: true,
-      });
-    }
-  }, [producto]);
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    const val = type === "checkbox" ? checked : value;
-    setForm((prev) => ({ ...prev, [name]: val }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    // Convertir campos numéricos
-    const payload = {
-      ...form,
-      precioCosto: form.precioCosto ? parseFloat(form.precioCosto) : 0,
-      precioVenta: form.precioVenta ? parseFloat(form.precioVenta) : 0,
-      stock: form.stock ? parseFloat(form.stock) : 0,
+        fechaVencimiento: "", // ← NUEVO CAMPO
+    });
+    const formatDate = (iso) => {
+        if (!iso) return "";
+        return iso.split("T")[0]; // ejemplo: "2025-12-06"
     };
 
-    // Si estamos editando, mantener el ID
-    if (producto?.id) {
-      payload.id = producto.id;
-    }
+    useEffect(() => {
+        if (producto) {
+            setForm({
+                sku: producto.sku || "",
+                nombre: producto.nombre || "",
+                descripcion: producto.descripcion || "",
+                precioCosto: producto.precioCosto?.toString() || "",
+                precioVenta: producto.precioVenta?.toString() || "",
+                stock: producto.stock?.toString() || "",
+                unidadMedida: producto.unidadMedida || "",
+                activo: producto.activo ?? true,
+                fechaVencimiento: formatDate(producto.fechaVencimiento),
+            });
+        } else {
+            setForm({
+                sku: "",
+                nombre: "",
+                descripcion: "",
+                precioCosto: "",
+                precioVenta: "",
+                stock: "",
+                unidadMedida: "",
+                activo: true,
+                fechaVencimiento: "", // ← RESETEO FECHA
+            });
+        }
+    }, [producto]);
 
-    onSave(payload);
-  };
+    const handleChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        const val = type === "checkbox" ? checked : value;
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{producto ? "Editar Producto" : "Nuevo Producto"}</h2>
-          <button onClick={onClose} className="modal-close">×</button>
-        </div>
+        setForm((prev) => ({
+            ...prev,
+            [name]: val,
+        }));
+    };
 
-        <form onSubmit={handleSubmit}>
-          <div className="modal-content">
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label">SKU *</label>
-                <input 
-                  name="sku" 
-                  value={form.sku} 
-                  onChange={handleChange} 
-                  className="modern-input" 
-                  required 
-                  placeholder="Ej: PROD-001"
-                />
-              </div>
+    const handleSubmit = (e) => {
+        e.preventDefault();
 
-              <div className="form-group">
-                <label className="form-label">Nombre *</label>
-                <input 
-                  name="nombre" 
-                  value={form.nombre} 
-                  onChange={handleChange} 
-                  className="modern-input" 
-                  required 
-                  placeholder="Nombre del producto"
-                />
-              </div>
+        const payload = {
+            ...form,
+            precioCosto: form.precioCosto ? parseFloat(form.precioCosto) : 0,
+            precioVenta: form.precioVenta ? parseFloat(form.precioVenta) : 0,
+            stock: form.stock ? parseFloat(form.stock) : 0,
+            fechaVencimiento: form.fechaVencimiento ? form.fechaVencimiento : null,
 
-              <div className="form-group full-width">
-                <label className="form-label">Descripción</label>
-                <textarea 
-                  name="descripcion" 
-                  value={form.descripcion} 
-                  onChange={handleChange} 
-                  className="modern-textarea" 
-                  placeholder="Descripción detallada del producto"
-                  rows="3"
-                />
-              </div>
+        };
 
-              <div className="form-group">
-                <label className="form-label">Precio Costo</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  name="precioCosto" 
-                  value={form.precioCosto} 
-                  onChange={handleChange} 
-                  className="modern-input" 
-                  placeholder="0.00"
-                />
-              </div>
+        if (producto?.id) {
+            payload.id = producto.id;
+        }
 
-              <div className="form-group">
-                <label className="form-label">Precio Venta</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  name="precioVenta" 
-                  value={form.precioVenta} 
-                  onChange={handleChange} 
-                  className="modern-input" 
-                  placeholder="0.00"
-                />
-              </div>
+        onSave(payload);
+    };
 
-              <div className="form-group">
-                <label className="form-label">Stock</label>
-                <input 
-                  type="number" 
-                  step="0.0001" 
-                  name="stock" 
-                  value={form.stock} 
-                  onChange={handleChange} 
-                  className="modern-input" 
-                  placeholder="0"
-                />
-              </div>
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2>{producto ? "Editar Producto" : "Nuevo Producto"}</h2>
+                    <button onClick={onClose} className="modal-close">×</button>
+                </div>
 
-              <div className="form-group">
-                <label className="form-label">Unidad de Medida</label>
-                <input 
-                  name="unidadMedida" 
-                  value={form.unidadMedida} 
-                  onChange={handleChange} 
-                  className="modern-input" 
-                  placeholder="Ej: kg, unidades, litros"
-                />
-              </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-content">
+                        <div className="form-grid">
 
-              <div className="form-group full-width">
-                <label className="checkbox-label">
-                  <input 
-                    type="checkbox" 
-                    name="activo" 
-                    checked={form.activo} 
-                    onChange={handleChange} 
-                    className="modern-checkbox"
-                  />
-                  <span className="checkmark"></span>
-                  Producto activo
-                </label>
-              </div>
+                            <div className="form-group">
+                                <label className="form-label">SKU *</label>
+                                <input
+                                    name="sku"
+                                    value={form.sku}
+                                    onChange={handleChange}
+                                    className="modern-input"
+                                    required
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Nombre *</label>
+                                <input
+                                    name="nombre"
+                                    value={form.nombre}
+                                    onChange={handleChange}
+                                    className="modern-input"
+                                    required
+                                />
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="form-label">Descripción</label>
+                                <textarea
+                                    name="descripcion"
+                                    value={form.descripcion}
+                                    onChange={handleChange}
+                                    className="modern-textarea"
+                                    rows="3"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Precio Costo</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    name="precioCosto"
+                                    value={form.precioCosto}
+                                    onChange={handleChange}
+                                    className="modern-input"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Precio Venta</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    name="precioVenta"
+                                    value={form.precioVenta}
+                                    onChange={handleChange}
+                                    className="modern-input"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Stock</label>
+                                <input
+                                    type="number"
+                                    step="0.0001"
+                                    name="stock"
+                                    value={form.stock}
+                                    onChange={handleChange}
+                                    className="modern-input"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Unidad de Medida</label>
+                                <input
+                                    name="unidadMedida"
+                                    value={form.unidadMedida}
+                                    onChange={handleChange}
+                                    className="modern-input"
+                                />
+                            </div>
+
+                            {/* CAMPO FECHA DE VENCIMIENTO */}
+                            <div className="form-group">
+                                <label className="form-label">Fecha de Vencimiento</label>
+                                <input
+                                    type="date"
+                                    name="fechaVencimiento"
+                                    value={form.fechaVencimiento || ""}
+                                    onChange={handleChange}
+                                    className="modern-input"
+                                />
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        name="activo"
+                                        checked={form.activo}
+                                        onChange={handleChange}
+                                        className="modern-checkbox"
+                                    />
+                                    <span className="checkmark"></span>
+                                    Producto activo
+                                </label>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div className="modal-actions">
+                        <button type="button" className="btn-secondary" onClick={onClose}>
+                            Cancelar
+                        </button>
+                        <button type="submit" className="btn-primary">
+                            {producto ? "Actualizar Producto" : "Crear Producto"}
+                        </button>
+                    </div>
+                </form>
+
             </div>
-          </div>
-
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
-            </button>
-            <button type="submit" className="btn-primary">
-              {producto ? "Actualizar Producto" : "Crear Producto"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+        </div>
+    );
 }

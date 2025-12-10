@@ -36,6 +36,7 @@ public class ProductoService {
         existente.setStock(producto.getStock());
         existente.setUnidadMedida(producto.getUnidadMedida());
         existente.setActivo(producto.getActivo());
+        existente.setFechaVencimiento(producto.getFechaVencimiento());
         return productoRepository.save(existente);
     }
 
