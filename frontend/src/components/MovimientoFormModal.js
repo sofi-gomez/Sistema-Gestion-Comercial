@@ -16,6 +16,7 @@ export default function MovimientoFormModal({ onClose, onSaved }) {
     "TARJETA_DEBITO",
     "TARJETA_CREDITO",
     "CHEQUE",
+      "CHEQUE_ELECTRONICO",
     "MERCADO_PAGO"
   ];
 

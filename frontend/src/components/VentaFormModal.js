@@ -174,8 +174,8 @@ export default function VentaFormModal({ onClose, onSaved }) {
                       <input 
                         className="modern-input" 
                         type="number" 
-                        step="0.0001" 
-                        min="0.0001"
+                        step="0.001"
+                        min="0.001"
                         value={it.cantidad} 
                         onChange={(e) => updateItem(idx, { cantidad: e.target.value })}
                         placeholder="Cantidad"
