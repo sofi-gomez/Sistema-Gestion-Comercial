@@ -212,6 +212,7 @@ export default function MercaderiaPage() {
                   <th>Precio Costo</th>
                   <th>Precio Venta</th>
                   <th>Unidad</th>
+                    <th>Vencimiento</th> {/* ← AGREGAR ESTO */}
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
@@ -244,6 +245,18 @@ export default function MercaderiaPage() {
                     <td className="unit-cell">
                       {producto.unidadMedida || '-'}
                     </td>
+
+                      {/* ← AGREGAR ESTA CELDA */}
+                      <td className="date-cell">
+                          {producto.fechaVencimiento ? (
+                              <span className="date-badge">
+                                  {new Date(producto.fechaVencimiento).toLocaleDateString('es-AR')}
+                                </span>
+                          ) : (
+                              <span className="no-date">-</span>
+                          )}
+
+                      </td>
                     <td className="status-cell">
                       <span className={`status-badge ${producto.activo ? 'active' : 'inactive'}`}>
                         {producto.activo ? 'Activo' : 'Inactivo'}
