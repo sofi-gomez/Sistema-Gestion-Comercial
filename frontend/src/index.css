@@ -688,46 +688,63 @@
   background: #fef2f2;
   color: #dc2626;
 }
-
-/* Botones de acción */
-.action-buttons {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-}
-
+/* ===== BOTÓN BASE OFICIAL ===== */
+.action-btn,
 .icon-btn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 16px;
 }
 
+/* EDITAR */
+.action-btn.edit,
 .icon-btn.edit {
-  background: #dbeafe;
-  color: #1d4ed8;
+    background-color: #eff6ff;
+    color: #2563eb;
 }
 
+.action-btn.edit:hover,
 .icon-btn.edit:hover {
-  background: #3b82f6;
-  color: white;
+    background-color: #dbeafe;
+    transform: scale(1.1);
 }
 
+/* ELIMINAR */
+.action-btn.delete,
 .icon-btn.delete {
-  background: #fef2f2;
-  color: #dc2626;
+    background-color: #fef2f2;
+    color: #dc2626;
 }
 
+.action-btn.delete:hover,
 .icon-btn.delete:hover {
-  background: #ef4444;
-  color: white;
+    background-color: #fee2e2;
+    transform: scale(1.1);
 }
+
+.action-btn:active,
+.icon-btn:active {
+    transform: scale(0.95);
+}
+
+.action-btn:disabled,
+.icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
 
 /* Botón primario */
 .btn-primary {
