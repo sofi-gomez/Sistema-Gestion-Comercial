@@ -3,6 +3,7 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 @Entity
@@ -25,13 +26,39 @@ public class Venta {
 
     private String estado;
 
-    // En la entidad Venta.java, agrega:
+    @Column(name = "anulada", nullable = false)
+    private Boolean anulada = false;
+
     @Column(name = "medio_pago")
     private String medioPago;
 
-    // Con su getter y setter
-    public String getMedioPago() { return medioPago; }
-    public void setMedioPago(String medioPago) { this.medioPago = medioPago; }
+    @Column(name = "nombre_cliente")
+    private String nombreCliente;
+
+    @Column(columnDefinition = "TEXT")
+    private String descripcion;
+
+    // ================= CAMPOS DE CHEQUE (nullable) =================
+
+    @Column(name = "cheque_banco")
+    private String chequeBanco;
+
+    @Column(name = "cheque_numero")
+    private String chequeNumero;
+
+    @Column(name = "cheque_librador")
+    private String chequeLibrador;
+
+    @Column(name = "cheque_fecha_emision")
+    private LocalDate chequeFechaEmision;
+
+    @Column(name = "cheque_fecha_cobro")
+    private LocalDate chequeFechaCobro;
+
+    @Column(name = "cheque_fecha_vencimiento")
+    private LocalDate chequeFechaVencimiento;
+
+    // ================================================================
 
     @OneToMany(mappedBy="venta", cascade=CascadeType.ALL, orphanRemoval=true)
     @JsonManagedReference
@@ -39,80 +66,85 @@ public class Venta {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    @PrePersist public void prePersist(){ fecha = LocalDateTime.now(); createdAt=updatedAt=LocalDateTime.now();}
-    @PreUpdate public void preUpdate(){ updatedAt=LocalDateTime.now();}
-    // getters/setters
 
+    @PrePersist
+    public void prePersist(){
+        fecha = LocalDateTime.now();
+        createdAt = updatedAt = LocalDateTime.now();
 
-    public Cliente getCliente() {
-        return cliente;
+        // Calcular fecha de vencimiento del cheque si tiene fecha de cobro
+        if (chequeFechaCobro != null && chequeFechaVencimiento == null) {
+            chequeFechaVencimiento = chequeFechaCobro.plusDays(30);
+        }
     }
 
-    public void setCliente(Cliente cliente) {
-        this.cliente = cliente;
+    @PreUpdate
+    public void preUpdate(){
+        updatedAt = LocalDateTime.now();
+
+        // Recalcular vencimiento si cambió la fecha de cobro
+        if (chequeFechaCobro != null && chequeFechaVencimiento == null) {
+            chequeFechaVencimiento = chequeFechaCobro.plusDays(30);
+        }
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
+    // ================= GETTERS Y SETTERS =================
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public String getEstado() {
-        return estado;
-    }
+    public Long getNumeroInterno() { return numeroInterno; }
+    public void setNumeroInterno(Long numeroInterno) { this.numeroInterno = numeroInterno; }
 
-    public void setEstado(String estado) {
-        this.estado = estado;
-    }
+    public LocalDateTime getFecha() { return fecha; }
+    public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
 
-    public LocalDateTime getFecha() {
-        return fecha;
-    }
+    public Cliente getCliente() { return cliente; }
+    public void setCliente(Cliente cliente) { this.cliente = cliente; }
 
-    public void setFecha(LocalDateTime fecha) {
-        this.fecha = fecha;
-    }
+    public BigDecimal getTotal() { return total; }
+    public void setTotal(BigDecimal total) { this.total = total; }
 
-    public Long getId() {
-        return id;
-    }
+    public String getEstado() { return estado; }
+    public void setEstado(String estado) { this.estado = estado; }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public Boolean getAnulada() { return anulada; }
+    public void setAnulada(Boolean anulada) { this.anulada = anulada; }
 
-    public List<VentaItem> getItems() {
-        return items;
-    }
+    public String getMedioPago() { return medioPago; }
+    public void setMedioPago(String medioPago) { this.medioPago = medioPago; }
 
-    public void setItems(List<VentaItem> items) {
-        this.items = items;
-    }
+    public String getNombreCliente() { return nombreCliente; }
+    public void setNombreCliente(String nombreCliente) { this.nombreCliente = nombreCliente; }
 
-    public Long getNumeroInterno() {
-        return numeroInterno;
-    }
+    public String getDescripcion() { return descripcion; }
+    public void setDescripcion(String descripcion) { this.descripcion = descripcion; }
 
-    public void setNumeroInterno(Long numeroInterno) {
-        this.numeroInterno = numeroInterno;
-    }
+    // Getters y Setters de Cheque
+    public String getChequeBanco() { return chequeBanco; }
+    public void setChequeBanco(String chequeBanco) { this.chequeBanco = chequeBanco; }
 
-    public BigDecimal getTotal() {
-        return total;
-    }
+    public String getChequeNumero() { return chequeNumero; }
+    public void setChequeNumero(String chequeNumero) { this.chequeNumero = chequeNumero; }
 
-    public void setTotal(BigDecimal total) {
-        this.total = total;
-    }
+    public String getChequeLibrador() { return chequeLibrador; }
+    public void setChequeLibrador(String chequeLibrador) { this.chequeLibrador = chequeLibrador; }
 
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
+    public LocalDate getChequeFechaEmision() { return chequeFechaEmision; }
+    public void setChequeFechaEmision(LocalDate chequeFechaEmision) { this.chequeFechaEmision = chequeFechaEmision; }
 
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
+    public LocalDate getChequeFechaCobro() { return chequeFechaCobro; }
+    public void setChequeFechaCobro(LocalDate chequeFechaCobro) { this.chequeFechaCobro = chequeFechaCobro; }
+
+    public LocalDate getChequeFechaVencimiento() { return chequeFechaVencimiento; }
+    public void setChequeFechaVencimiento(LocalDate chequeFechaVencimiento) { this.chequeFechaVencimiento = chequeFechaVencimiento; }
+
+    public List<VentaItem> getItems() { return items; }
+    public void setItems(List<VentaItem> items) { this.items = items; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }
