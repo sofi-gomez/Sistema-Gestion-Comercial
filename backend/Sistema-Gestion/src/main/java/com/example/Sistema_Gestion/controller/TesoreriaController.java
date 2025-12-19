@@ -34,4 +34,11 @@ public class TesoreriaController {
         LocalDateTime hastaDt = LocalDateTime.parse(hasta);
         return tesoreriaService.listarPorRango(desdeDt, hastaDt);
     }
+
+    @GetMapping("/cheques/alertas")
+    public List<MovimientoTesoreria> chequesProximosAVencer(
+            @RequestParam(defaultValue = "7") int dias) {
+        return tesoreriaService.chequesProximosAVencer(dias);
+    }
+
 }
