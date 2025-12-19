@@ -85,7 +85,7 @@ public class Producto {
         this.descripcion = descripcion;
     }
 
-    // ← AGREGAR ESTOS GETTER Y SETTER AQUÍ
+    // GETTER Y SETTER DE FECHA DE VENCIMIENTO
     public LocalDate getFechaVencimiento() {
         return fechaVencimiento;
     }
