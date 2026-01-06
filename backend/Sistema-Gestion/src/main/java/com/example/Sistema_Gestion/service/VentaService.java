@@ -135,8 +135,63 @@ public class VentaService {
                 }
             }
 
-            return ventaRepository.save(ventaExistente);
+            Venta ventaGuardada = ventaRepository.save(ventaExistente);
+
+            // ✅ ACTUALIZAR MOVIMIENTO DE TESORERÍA ASOCIADO
+            actualizarMovimientoTesoreria(ventaGuardada);
+
+            return ventaGuardada;
         });
+    }
+
+    private void actualizarMovimientoTesoreria(Venta venta) {
+        // Buscar el movimiento asociado a esta venta
+        List<MovimientoTesoreria> movimientos = tesoreriaService.buscarPorVentaId(venta.getId());
+
+        if (!movimientos.isEmpty()) {
+            MovimientoTesoreria movimiento = movimientos.get(0);
+
+            // Actualizar datos básicos del movimiento
+            movimiento.setImporte(venta.getTotal());
+            movimiento.setReferencia("Venta #" + venta.getNumeroInterno());
+
+            // Actualizar medio de pago
+            String medioPago = venta.getMedioPago() != null ? venta.getMedioPago() : "EFECTIVO";
+            try {
+                MovimientoTesoreria.MedioPago medioPagoEnum = MovimientoTesoreria.MedioPago.valueOf(medioPago);
+                movimiento.setMedioPagoEnum(medioPagoEnum);
+            } catch (IllegalArgumentException e) {
+                movimiento.setMedioPagoEnum(MovimientoTesoreria.MedioPago.EFECTIVO);
+            }
+
+            // Actualizar datos del cheque si aplica
+            if (medioPago.contains("CHEQUE") && venta.getChequeBanco() != null) {
+                movimiento.setBanco(venta.getChequeBanco());
+                movimiento.setNumeroCheque(venta.getChequeNumero());
+                movimiento.setLibrador(venta.getChequeLibrador());
+                movimiento.setFechaEmision(venta.getChequeFechaEmision());
+                movimiento.setFechaCobro(venta.getChequeFechaCobro());
+                movimiento.setFechaVencimiento(venta.getChequeFechaVencimiento());
+
+                // Setear tipo de cheque basado en el medio de pago
+                if (medioPago.equals("CHEQUE_ELECTRONICO")) {
+                    movimiento.setTipoChequeEnum(MovimientoTesoreria.TipoCheque.ELECTRONICO);
+                } else {
+                    movimiento.setTipoChequeEnum(MovimientoTesoreria.TipoCheque.FISICO);
+                }
+            } else {
+                // Si ya no es cheque, limpiar los datos del cheque
+                movimiento.setBanco(null);
+                movimiento.setNumeroCheque(null);
+                movimiento.setLibrador(null);
+                movimiento.setFechaEmision(null);
+                movimiento.setFechaCobro(null);
+                movimiento.setFechaVencimiento(null);
+                movimiento.setTipoCheque(null);
+            }
+
+            tesoreriaService.registrarMovimiento(movimiento);
+        }
     }
 
     @Transactional
