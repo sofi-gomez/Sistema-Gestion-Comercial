@@ -47,4 +47,8 @@ public class TesoreriaService {
             movimientoRepository.save(mov);
         }
     }
+
+    public List<MovimientoTesoreria> buscarPorVentaId(Long ventaId) {
+        return movimientoRepository.findByVentaId(ventaId);
+    }
 }
