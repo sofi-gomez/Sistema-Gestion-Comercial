@@ -69,14 +69,14 @@ export default function TesoreriaPage() {
     // Obtener medios de pago únicos para filtros
     const mediosPago = [...new Set(movimientos.map(m => m.medioPago).filter(Boolean))];
 
-    // ✅ Función para formatear fechas
+    //Función para formatear fechas
     const formatearFecha = (fecha) => {
         if (!fecha) return "-";
         const date = new Date(fecha);
         return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
-    // ✅ Función para verificar si un cheque está próximo a vencer (7 días)
+    //Función para verificar si un cheque está próximo a vencer (7 días)
     const estaProximoAVencer = (fechaVencimiento) => {
         if (!fechaVencimiento) return false;
         const hoy = new Date();
@@ -85,7 +85,7 @@ export default function TesoreriaPage() {
         return diasDiferencia > 0 && diasDiferencia <= 7;
     };
 
-    // ✅ Función para verificar si un cheque está vencido
+    //Función para verificar si un cheque está vencido
     const estaVencido = (fechaVencimiento) => {
         if (!fechaVencimiento) return false;
         const hoy = new Date();
