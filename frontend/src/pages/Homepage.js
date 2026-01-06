@@ -7,7 +7,8 @@ import {
     FiFileText,
     FiDollarSign,
     FiBarChart2,
-    FiAlertTriangle
+    FiAlertTriangle,
+    FiAlertCircle
 } from "react-icons/fi";
 import "../index.css";
 
@@ -25,8 +26,10 @@ export default function HomePage() {
 
     const [productos, setProductos] = useState([]);
     const [vencimientos, setVencimientos] = useState([]);
+    const [chequesProximos, setChequesProximos] = useState([]);
 
     const API_URL = "http://localhost:8080/api/productos";
+    const API_TESORERIA = "http://localhost:8080/api/tesoreria";
 
     useEffect(() => {
         const fetchProductos = async () => {
@@ -53,7 +56,38 @@ export default function HomePage() {
             }
         };
 
+        const fetchCheques = async () => {
+            try {
+                const res = await fetch(API_TESORERIA);
+                const data = await res.json();
+
+                // ----------- Detectar cheques próximos a vencer (15 días) -----------
+                const hoy = new Date();
+                hoy.setHours(0, 0, 0, 0);
+
+                const chequesActivos = data
+                    .filter(m =>
+                        !m.anulado && // No anulados
+                        m.medioPago?.includes("CHEQUE") && // Es un cheque
+                        m.fechaVencimiento // Tiene fecha de vencimiento
+                    )
+                    .map((m) => {
+                        const fechaVenc = new Date(m.fechaVencimiento);
+                        fechaVenc.setHours(0, 0, 0, 0);
+                        const diff = Math.ceil((fechaVenc - hoy) / (1000 * 60 * 60 * 24));
+                        return { ...m, diasRestantes: diff };
+                    })
+                    .filter((m) => m.diasRestantes >= 0 && m.diasRestantes <= 15) // Próximos 15 días
+                    .sort((a, b) => a.diasRestantes - b.diasRestantes); // Ordenar por urgencia
+
+                setChequesProximos(chequesActivos);
+            } catch (err) {
+                console.error("Error cargando cheques:", err);
+            }
+        };
+
         fetchProductos();
+        fetchCheques();
     }, []);
 
     return (
@@ -73,7 +107,61 @@ export default function HomePage() {
 
             <main className="home-main">
 
-                {/* ------------- PANEL DE ALERTAS ------------- */}
+                {/* ------------- PANEL DE ALERTAS: CHEQUES PRÓXIMOS A VENCER ------------- */}
+                {chequesProximos.length > 0 && (
+                    <div className="alert-box" style={{
+                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                        borderColor: '#f59e0b'
+                    }}>
+                        <div className="alert-header">
+                            <FiAlertCircle className="alert-icon" style={{ color: '#d97706' }} />
+                            <div>
+                                <h2 style={{ color: '#78350f' }}>
+                                    Cheques próximos a vencer
+                                </h2>
+                                <p style={{ color: '#92400e' }}>
+                                    Tienes {chequesProximos.length} cheque{chequesProximos.length > 1 ? 's' : ''} que vence{chequesProximos.length > 1 ? 'n' : ''} en los próximos 15 días.
+                                </p>
+                            </div>
+                        </div>
+
+                        <ul className="alert-list" style={{ color: '#78350f' }}>
+                            {chequesProximos.slice(0, 5).map((cheque) => (
+                                <li key={cheque.id}>
+                                    <strong>Cheque #{cheque.numeroCheque}</strong>
+                                    {cheque.librador && ` de ${cheque.librador}`} —
+                                    {cheque.diasRestantes === 0 ? (
+                                        <span style={{ color: '#dc2626', fontWeight: 'bold' }}> vence HOY</span>
+                                    ) : cheque.diasRestantes === 1 ? (
+                                        <span style={{ color: '#ea580c', fontWeight: 'bold' }}> vence MAÑANA</span>
+                                    ) : (
+                                        ` vence en ${cheque.diasRestantes} días`
+                                    )}
+                                    {cheque.banco && ` (${cheque.banco})`}
+                                </li>
+                            ))}
+                        </ul>
+
+                        {chequesProximos.length > 5 && (
+                            <p className="alert-extra" style={{ color: '#92400e' }}>
+                                + {chequesProximos.length - 5} cheque{chequesProximos.length - 5 > 1 ? 's' : ''} más...
+                            </p>
+                        )}
+
+                        <button
+                            className="alert-btn"
+                            onClick={() => navigate("/tesoreria")}
+                            style={{
+                                background: '#f59e0b',
+                                color: 'white'
+                            }}
+                        >
+                            Ir a Tesorería
+                        </button>
+                    </div>
+                )}
+
+                {/* ------------- PANEL DE ALERTAS: PRODUCTOS PRÓXIMOS A VENCER ------------- */}
                 {vencimientos.length > 0 && (
                     <div className="alert-box">
                         <div className="alert-header">
