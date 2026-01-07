@@ -47,7 +47,7 @@ public class VentaService {
         // 4) disminuir stock
         if (saved.getItems() != null) {
             for (VentaItem it : saved.getItems()) {
-                productoService.disminuirStock(it.getProducto().getId(), it.getCantidad().doubleValue());
+                productoService.descontarStock(it.getProducto().getId(), it.getCantidad());
             }
         }
 
