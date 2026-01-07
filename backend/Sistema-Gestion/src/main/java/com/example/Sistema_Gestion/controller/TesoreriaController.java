@@ -2,9 +2,9 @@ package com.example.Sistema_Gestion.controller;
 
 import com.example.Sistema_Gestion.model.MovimientoTesoreria;
 import com.example.Sistema_Gestion.service.TesoreriaService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -17,28 +17,36 @@ public class TesoreriaController {
         this.tesoreriaService = tesoreriaService;
     }
 
-    @GetMapping
-    public List<MovimientoTesoreria> listarTodos() {
-        return tesoreriaService.listarTodos();
-    }
-
     @PostMapping
     public MovimientoTesoreria registrarMovimiento(@RequestBody MovimientoTesoreria movimiento) {
         return tesoreriaService.registrarMovimiento(movimiento);
     }
 
-    @GetMapping("/rango")
-    public List<MovimientoTesoreria> listarPorRango(@RequestParam String desde,
-                                                    @RequestParam String hasta) {
-        LocalDateTime desdeDt = LocalDateTime.parse(desde);
-        LocalDateTime hastaDt = LocalDateTime.parse(hasta);
-        return tesoreriaService.listarPorRango(desdeDt, hastaDt);
+    @GetMapping
+    public List<MovimientoTesoreria> listarTodos() {
+        return tesoreriaService.listarTodos();
     }
 
-    @GetMapping("/cheques/alertas")
-    public List<MovimientoTesoreria> chequesProximosAVencer(
-            @RequestParam(defaultValue = "7") int dias) {
-        return tesoreriaService.chequesProximosAVencer(dias);
+    @GetMapping("/{id}")
+    public ResponseEntity<MovimientoTesoreria> buscarPorId(@PathVariable Long id) {
+        return tesoreriaService.buscarPorId(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<MovimientoTesoreria> actualizarMovimiento(
+            @PathVariable Long id,
+            @RequestBody MovimientoTesoreria movimiento) {
+        return tesoreriaService.actualizarMovimiento(id, movimiento)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}/cobrar")
+    public ResponseEntity<MovimientoTesoreria> marcarComoCobrado(@PathVariable Long id) {
+        return tesoreriaService.marcarComoCobrado(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 }
