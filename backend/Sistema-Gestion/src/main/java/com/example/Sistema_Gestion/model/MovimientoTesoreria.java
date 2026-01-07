@@ -53,6 +53,9 @@ public class MovimientoTesoreria {
     @Column(name = "anulado", nullable = false)
     private Boolean anulado = false;
 
+    @Column(name = "cobrado", nullable = false)
+    private Boolean cobrado = false;
+
     @Column(name = "venta_id")
     private Long ventaId;
 
@@ -89,6 +92,11 @@ public class MovimientoTesoreria {
         }
         if (updatedAt == null) {
             updatedAt = LocalDateTime.now();
+        }
+
+        // Marcar como cobrado automáticamente si es EFECTIVO
+        if ("EFECTIVO".equals(this.medioPago)) {
+            this.cobrado = true;
         }
 
         calcularVencimientoCheque();
@@ -192,6 +200,9 @@ public class MovimientoTesoreria {
 
     public Boolean getAnulado() { return anulado; }
     public void setAnulado(Boolean anulado) { this.anulado = anulado; }
+
+    public Boolean getCobrado() { return cobrado; }
+    public void setCobrado(Boolean cobrado) { this.cobrado = cobrado; }
 
     public Long getVentaId() { return ventaId; }
     public void setVentaId(Long ventaId) { this.ventaId = ventaId; }
