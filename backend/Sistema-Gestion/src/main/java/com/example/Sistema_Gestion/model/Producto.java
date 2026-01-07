@@ -1,98 +1,46 @@
 package com.example.Sistema_Gestion.model;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
-import java.time.LocalDate;      // ← AGREGAR ESTA IMPORTACIÓN
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "producto")
-
 public class Producto {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique=true)
+    @Column(unique = true, nullable = false)
     private String sku;
 
-    @Column(nullable=false)
+    @Column(nullable = false)
     private String nombre;
 
     @Column(columnDefinition = "TEXT")
     private String descripcion;
 
-    @Column(precision = 14, scale = 2)
-    private BigDecimal precioCosto = BigDecimal.ZERO;
+    @Column(name = "precio_costo", precision = 10, scale = 2)
+    private BigDecimal precioCosto;
 
-    @Column(precision = 14, scale = 2)
-    private BigDecimal precioVenta = BigDecimal.ZERO;
+    @Column(name = "precio_venta", precision = 10, scale = 2)
+    private BigDecimal precioVenta;
 
-    @Column(precision = 18, scale = 4)
-    private BigDecimal stock = BigDecimal.ZERO;
+    // ✅ CAMBIO CRÍTICO: De BigDecimal a Integer
+    @Column(nullable = false)
+    private Integer stock = 0;
 
+    @Column(name = "unidad_medida")
     private String unidadMedida;
+
+    @Column(nullable = false)
     private Boolean activo = true;
 
-    // ← AGREGAR ESTE CAMPO AQUÍ
-    @JsonFormat(pattern = "yyyy-MM-dd")
     @Column(name = "fecha_vencimiento")
     private LocalDate fechaVencimiento;
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-
-    private Boolean eliminado = false;
-
-    // getters y setters
-    public Boolean getEliminado() { return eliminado; }
-    public void setEliminado(Boolean eliminado) { this.eliminado = eliminado; }
-
-
-    @PrePersist
-    public void prePersist() {
-        createdAt = LocalDateTime.now();
-        updatedAt = createdAt;
-    }
-    @PreUpdate
-    public void preUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-
-    //getters and setters
-
-    public Boolean getActivo() {
-        return activo;
-    }
-
-    public void setActivo(Boolean activo) {
-        this.activo = activo;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public String getDescripcion() {
-        return descripcion;
-    }
-
-    public void setDescripcion(String descripcion) {
-        this.descripcion = descripcion;
-    }
-
-    // GETTER Y SETTER DE FECHA DE VENCIMIENTO
-    public LocalDate getFechaVencimiento() {
-        return fechaVencimiento;
-    }
-
-    public void setFechaVencimiento(LocalDate fechaVencimiento) {
-        this.fechaVencimiento = fechaVencimiento;
-    }
+    // =================== GETTERS Y SETTERS ===================
 
     public Long getId() {
         return id;
@@ -102,12 +50,28 @@ public class Producto {
         this.id = id;
     }
 
+    public String getSku() {
+        return sku;
+    }
+
+    public void setSku(String sku) {
+        this.sku = sku;
+    }
+
     public String getNombre() {
         return nombre;
     }
 
     public void setNombre(String nombre) {
         this.nombre = nombre;
+    }
+
+    public String getDescripcion() {
+        return descripcion;
+    }
+
+    public void setDescripcion(String descripcion) {
+        this.descripcion = descripcion;
     }
 
     public BigDecimal getPrecioCosto() {
@@ -126,19 +90,11 @@ public class Producto {
         this.precioVenta = precioVenta;
     }
 
-    public String getSku() {
-        return sku;
-    }
-
-    public void setSku(String sku) {
-        this.sku = sku;
-    }
-
-    public BigDecimal getStock() {
+    public Integer getStock() {
         return stock;
     }
 
-    public void setStock(BigDecimal stock) {
+    public void setStock(Integer stock) {
         this.stock = stock;
     }
 
@@ -150,11 +106,19 @@ public class Producto {
         this.unidadMedida = unidadMedida;
     }
 
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
+    public Boolean getActivo() {
+        return activo;
     }
 
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
+    public void setActivo(Boolean activo) {
+        this.activo = activo;
+    }
+
+    public LocalDate getFechaVencimiento() {
+        return fechaVencimiento;
+    }
+
+    public void setFechaVencimiento(LocalDate fechaVencimiento) {
+        this.fechaVencimiento = fechaVencimiento;
     }
 }

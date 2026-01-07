@@ -7,7 +7,8 @@ import java.math.BigDecimal;
 @Table(name="compra_item")
 public class CompraItem {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
@@ -18,8 +19,9 @@ public class CompraItem {
     @JoinColumn(name="producto_id", nullable=false)
     private Producto producto;
 
-    @Column(precision=18, scale=4, nullable=false)
-    private BigDecimal cantidad;
+    // ✅ CAMBIO CRÍTICO: De BigDecimal a Integer
+    @Column(nullable=false)
+    private Integer cantidad;
 
     @Column(precision=14, scale=2, nullable=false)
     private BigDecimal precioUnitario;
@@ -27,12 +29,14 @@ public class CompraItem {
     @Column(precision=14, scale=2, nullable=false)
     private BigDecimal subtotal;
 
-    public BigDecimal getCantidad() {
-        return cantidad;
+    // =================== GETTERS Y SETTERS ===================
+
+    public Long getId() {
+        return id;
     }
 
-    public void setCantidad(BigDecimal cantidad) {
-        this.cantidad = cantidad;
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public Compra getCompra() {
@@ -43,12 +47,20 @@ public class CompraItem {
         this.compra = compra;
     }
 
-    public Long getId() {
-        return id;
+    public Producto getProducto() {
+        return producto;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public void setProducto(Producto producto) {
+        this.producto = producto;
+    }
+
+    public Integer getCantidad() {
+        return cantidad;
+    }
+
+    public void setCantidad(Integer cantidad) {
+        this.cantidad = cantidad;
     }
 
     public BigDecimal getPrecioUnitario() {
@@ -57,14 +69,6 @@ public class CompraItem {
 
     public void setPrecioUnitario(BigDecimal precioUnitario) {
         this.precioUnitario = precioUnitario;
-    }
-
-    public Producto getProducto() {
-        return producto;
-    }
-
-    public void setProducto(Producto producto) {
-        this.producto = producto;
     }
 
     public BigDecimal getSubtotal() {
