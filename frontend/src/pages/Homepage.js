@@ -68,6 +68,7 @@ export default function HomePage() {
                 const chequesActivos = data
                     .filter(m =>
                         !m.anulado && // No anulados
+                        !m.cobrado && // ✅ NUEVO: No cobrados (pendientes)
                         m.medioPago?.includes("CHEQUE") && // Es un cheque
                         m.fechaVencimiento // Tiene fecha de vencimiento
                     )
