@@ -26,7 +26,7 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
                 descripcion: producto.descripcion || "",
                 precioCosto: producto.precioCosto?.toString() || "",
                 precioVenta: producto.precioVenta?.toString() || "",
-                stock: producto.stock?.toString() || "",
+                stock: producto.stock ? Math.floor(producto.stock).toString() : "", // ✅ Redondear a entero
                 unidadMedida: producto.unidadMedida || "",
                 activo: producto.activo ?? true,
                 fechaVencimiento: formatDate(producto.fechaVencimiento),
@@ -63,7 +63,7 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
             ...form,
             precioCosto: form.precioCosto ? parseFloat(form.precioCosto) : 0,
             precioVenta: form.precioVenta ? parseFloat(form.precioVenta) : 0,
-            stock: form.stock ? parseFloat(form.stock) : 0,
+            stock: form.stock ? parseInt(form.stock, 10) : 0, // ✅ Cambiar a parseInt para enteros
             fechaVencimiento: form.fechaVencimiento ? form.fechaVencimiento : null,
 
         };
@@ -145,14 +145,16 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">Stock</label>
+                                <label className="form-label">Stock (unidades)</label>
                                 <input
                                     type="number"
-                                    step="0.0001"
+                                    step="1"
+                                    min="0"
                                     name="stock"
                                     value={form.stock}
                                     onChange={handleChange}
                                     className="modern-input"
+                                    placeholder="Ej: 100"
                                 />
                             </div>
 
@@ -163,6 +165,7 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
                                     value={form.unidadMedida}
                                     onChange={handleChange}
                                     className="modern-input"
+                                    placeholder="Ej: unidades, kg, litros"
                                 />
                             </div>
 
