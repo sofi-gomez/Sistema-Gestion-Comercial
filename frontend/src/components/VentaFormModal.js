@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
 import CamposCheque from "./CamposCheque";
 import "../index.css";
 
 export default function VentaFormModal({ onClose, onSaved, ventaEditar }) {
     const [productos, setProductos] = useState([]);
+    const [clientes, setClientes] = useState([]);
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [medioPago, setMedioPago] = useState("EFECTIVO");
@@ -12,6 +13,13 @@ export default function VentaFormModal({ onClose, onSaved, ventaEditar }) {
     // Campos de la venta
     const [nombreCliente, setNombreCliente] = useState("");
     const [descripcion, setDescripcion] = useState("");
+
+    // Estados para autocompletado de clientes
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [filteredClientes, setFilteredClientes] = useState([]);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
+    const clienteInputRef = useRef(null);
+    const suggestionsRef = useRef(null);
 
     // Estados para datos del cheque
     const [banco, setBanco] = useState("");
@@ -21,21 +29,39 @@ export default function VentaFormModal({ onClose, onSaved, ventaEditar }) {
     const [fechaCobro, setFechaCobro] = useState("");
 
     const API_PRODUCTOS = "http://localhost:8080/api/productos";
+    const API_CLIENTES = "http://localhost:8080/api/clientes";
     const API_VENTAS = "http://localhost:8080/api/ventas";
 
     useEffect(() => {
         const load = async () => {
             try {
-                const response = await fetch(API_PRODUCTOS);
-                const productosJson = await response.json();
+                const [productosRes, clientesRes] = await Promise.all([
+                    fetch(API_PRODUCTOS),
+                    fetch(API_CLIENTES)
+                ]);
+                const productosJson = await productosRes.json();
+                const clientesJson = await clientesRes.json();
                 setProductos(productosJson || []);
+                setClientes(clientesJson || []);
             } catch (err) {
-                console.error("Error cargando productos:", err);
+                console.error("Error cargando datos:", err);
             } finally {
                 setLoading(false);
             }
         };
         load();
+    }, []);
+
+    // Cerrar sugerencias al hacer clic fuera
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (suggestionsRef.current && !suggestionsRef.current.contains(event.target) &&
+                clienteInputRef.current && !clienteInputRef.current.contains(event.target)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
     // Cargar datos de la venta si estamos editando
@@ -66,8 +92,55 @@ export default function VentaFormModal({ onClose, onSaved, ventaEditar }) {
     }, [ventaEditar]);
 
     useEffect(() => {
-        if (items.length === 0) addEmptyItem();
-    }, [productos]);
+        if (items.length === 0 && productos.length > 0 && !ventaEditar) {
+            addEmptyItem();
+        }
+    }, [productos.length]);
+
+    // Manejar cambio en el input de cliente con autocompletado
+    const handleClienteChange = (e) => {
+        const value = e.target.value;
+        setNombreCliente(value);
+
+        if (value.trim().length > 0) {
+            const filtered = clientes.filter(cliente =>
+                cliente.nombre?.toLowerCase().includes(value.toLowerCase())
+            );
+            setFilteredClientes(filtered);
+            setShowSuggestions(true);
+            setSelectedIndex(-1);
+        } else {
+            setShowSuggestions(false);
+            setFilteredClientes([]);
+        }
+    };
+
+    // Seleccionar cliente de la lista
+    const handleSelectCliente = (cliente) => {
+        setNombreCliente(cliente.nombre);
+        setShowSuggestions(false);
+        setSelectedIndex(-1);
+    };
+
+    // Navegación con teclado en sugerencias
+    const handleClienteKeyDown = (e) => {
+        if (!showSuggestions || filteredClientes.length === 0) return;
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setSelectedIndex(prev =>
+                prev < filteredClientes.length - 1 ? prev + 1 : prev
+            );
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setSelectedIndex(prev => (prev > 0 ? prev - 1 : -1));
+        } else if (e.key === "Enter" && selectedIndex >= 0) {
+            e.preventDefault();
+            handleSelectCliente(filteredClientes[selectedIndex]);
+        } else if (e.key === "Escape") {
+            setShowSuggestions(false);
+        }
+    };
 
     const addEmptyItem = () => {
         setItems((s) => [...s, { productoId: "", cantidad: 1, precioUnitario: 0, subtotal: 0 }]);
@@ -170,7 +243,7 @@ export default function VentaFormModal({ onClose, onSaved, ventaEditar }) {
                 <div className="modal-card">
                     <div className="loading-state">
                         <div className="loading-spinner"></div>
-                        <p>Cargando productos...</p>
+                        <p>Cargando datos...</p>
                     </div>
                 </div>
             </div>
@@ -189,16 +262,92 @@ export default function VentaFormModal({ onClose, onSaved, ventaEditar }) {
 
                 <form onSubmit={handleSubmit}>
                     <div className="modal-content">
-                        {/* Datos del cliente */}
-                        <div className="form-group">
+                        {/* Campo de cliente con autocompletado */}
+                        <div className="form-group" style={{ position: 'relative' }}>
                             <label className="form-label">Nombre del Cliente *</label>
                             <input
+                                ref={clienteInputRef}
                                 value={nombreCliente}
-                                onChange={(e) => setNombreCliente(e.target.value)}
+                                onChange={handleClienteChange}
+                                onKeyDown={handleClienteKeyDown}
+                                onFocus={() => {
+                                    if (nombreCliente.trim().length > 0 && filteredClientes.length > 0) {
+                                        setShowSuggestions(true);
+                                    }
+                                }}
                                 className="modern-input"
-                                placeholder="Nombre del cliente"
+                                placeholder="Buscar o escribir nombre del cliente..."
+                                autoComplete="off"
                                 required
                             />
+
+                            {/* Sugerencias de clientes */}
+                            {showSuggestions && filteredClientes.length > 0 && (
+                                <div
+                                    ref={suggestionsRef}
+                                    style={{
+                                        position: "absolute",
+                                        top: "100%",
+                                        left: 0,
+                                        right: 0,
+                                        backgroundColor: "white",
+                                        border: "1px solid #e5e7eb",
+                                        borderRadius: "8px",
+                                        marginTop: "4px",
+                                        maxHeight: "200px",
+                                        overflowY: "auto",
+                                        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                                        zIndex: 1000,
+                                    }}
+                                >
+                                    {filteredClientes.map((cliente, index) => (
+                                        <div
+                                            key={cliente.id}
+                                            onClick={() => handleSelectCliente(cliente)}
+                                            onMouseEnter={() => setSelectedIndex(index)}
+                                            style={{
+                                                padding: "10px 12px",
+                                                cursor: "pointer",
+                                                backgroundColor: index === selectedIndex ? "#f3f4f6" : "white",
+                                                borderBottom: index < filteredClientes.length - 1 ? "1px solid #f3f4f6" : "none",
+                                                transition: "background-color 0.15s",
+                                            }}
+                                        >
+                                            <div style={{ fontWeight: "500", color: "#111827" }}>
+                                                {cliente.nombre}
+                                            </div>
+                                            {cliente.telefono && (
+                                                <div style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+                                                    {cliente.telefono}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Mensaje cuando no hay coincidencias */}
+                            {showSuggestions && nombreCliente.trim().length > 0 && filteredClientes.length === 0 && (
+                                <div
+                                    style={{
+                                        position: "absolute",
+                                        top: "100%",
+                                        left: 0,
+                                        right: 0,
+                                        backgroundColor: "white",
+                                        border: "1px solid #e5e7eb",
+                                        borderRadius: "8px",
+                                        marginTop: "4px",
+                                        padding: "10px 12px",
+                                        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                                        zIndex: 1000,
+                                        color: "#6b7280",
+                                        fontSize: "0.875rem",
+                                    }}
+                                >
+                                    Cliente nuevo - se registrará con este nombre
+                                </div>
+                            )}
                         </div>
 
                         <div className="form-group">
