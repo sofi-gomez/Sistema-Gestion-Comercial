@@ -242,10 +242,6 @@ sistema-gestion-comercial/
 └── README.md
 ```
 
-## 📄 Licencia
-
-Este proyecto es de código abierto y está disponible bajo la [MIT License](LICENSE).
-
 ## 👤 Autoras
 
 **Sofia Gutierrez, Guadalupe Aban, Sonia Guevara, Guadalupe Dominguez y Sofía Gómez**
