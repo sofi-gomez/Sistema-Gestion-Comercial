@@ -2,6 +2,7 @@ package com.example.Sistema_Gestion.model;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +18,8 @@ public class Remito {
     @Column(nullable = false, unique = true)
     private Long numero;
 
-    private LocalDateTime fecha;
+    // ✅ CAMBIO: LocalDateTime → LocalDate
+    private LocalDate fecha;
 
     // Campos para cliente manual
     @Column(name="cliente_nombre")
@@ -44,7 +46,8 @@ public class Remito {
 
     @PrePersist
     public void prePersist(){
-        fecha = LocalDateTime.now();
+        // ✅ CAMBIO: Usar LocalDate.now() en lugar de LocalDateTime
+        fecha = LocalDate.now();
         createdAt = updatedAt = LocalDateTime.now();
     }
 
@@ -60,8 +63,9 @@ public class Remito {
     public Long getNumero() { return numero; }
     public void setNumero(Long numero) { this.numero = numero; }
 
-    public LocalDateTime getFecha() { return fecha; }
-    public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
+    // ✅ CAMBIO: Retorna LocalDate
+    public LocalDate getFecha() { return fecha; }
+    public void setFecha(LocalDate fecha) { this.fecha = fecha; }
 
     public String getClienteNombre() { return clienteNombre; }
     public void setClienteNombre(String clienteNombre) { this.clienteNombre = clienteNombre; }
