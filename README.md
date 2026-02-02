@@ -8,8 +8,7 @@ Sistema integral de gestión comercial desarrollado para optimizar las operacion
 - [Tecnologías](#-tecnologías)
 - [Módulos](#-módulos)
 - [Instalación](#-instalación)
-- [Licencia](#-licencia)
-
+  
 ## ✨ Características
 
 ### 🎯 Funcionalidades Principales
