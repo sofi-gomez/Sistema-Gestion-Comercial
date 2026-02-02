@@ -1,6 +1,6 @@
 package com.example.Sistema_Gestion.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 
@@ -14,14 +14,13 @@ public class VentaItem {
 
     @ManyToOne
     @JoinColumn(name = "venta_id")
-    @JsonIgnore
+    @JsonBackReference  // ✅ CAMBIADO de @JsonIgnore a @JsonBackReference
     private Venta venta;
 
     @ManyToOne
     @JoinColumn(name = "producto_id")
     private Producto producto;
 
-    // ✅ CAMBIO: De BigDecimal a Integer
     @Column(nullable = false)
     private Integer cantidad;
 
