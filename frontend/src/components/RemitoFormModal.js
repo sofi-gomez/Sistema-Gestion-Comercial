@@ -131,14 +131,18 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
     };
 
     const handleClienteChange = (id) => {
-        const c = clientes.find(x => String(x.id) === String(id)) || null;
+        const c = clientes.find(x => String(x.id) === String(id));
+        if (!c) return;
+
         setForm(prev => ({
             ...prev,
             cliente: c,
-            clienteNombre: c ? c.nombre : prev.clienteNombre
+            clienteNombre: c.nombre || "",
+            clienteDireccion: c.direccion || "",
+            clienteCodigoPostal: c.codigoPostal || "",
+            clienteAclaracion: c.condicionIva || ""
         }));
     };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -233,13 +237,36 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">Nombre cliente</label>
-                                <input
+                                <label className="form-label">Proveedor</label>
+                                <select
                                     className="modern-input"
-                                    value={form.clienteNombre || ""}
-                                    onChange={e => setForm(prev => ({ ...prev, clienteNombre: e.target.value }))}
-                                    placeholder="Nombre del cliente"
-                                />
+                                    value={form.proveedor?.id || ""}
+                                    onChange={e => handleProveedorChange(e.target.value)}
+                                    required
+                                >
+                                    <option value="">-- Seleccionar proveedor --</option>
+                                    {proveedores.map(p => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.nombre}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="form-label">Cliente *</label>
+                                <select
+                                    className="modern-input"
+                                    value={form.cliente?.id || ""}
+                                    onChange={e => handleClienteChange(e.target.value)}
+                                    required
+                                >
+                                    <option value="">-- Seleccionar cliente --</option>
+                                    {clientes.map(c => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.nombre}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div className="form-group">
