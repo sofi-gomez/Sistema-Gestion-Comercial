@@ -18,8 +18,17 @@ public class Remito {
     @Column(nullable = false, unique = true)
     private Long numero;
 
-    // ✅ CAMBIO: LocalDateTime → LocalDate
+    // ✅ Fecha como LocalDate
     private LocalDate fecha;
+
+    // ✅ PROVEEDOR RESTAURADO
+    @ManyToOne
+    @JoinColumn(name = "proveedor_id")
+    private Proveedor proveedor;
+
+    @ManyToOne
+    @JoinColumn(name = "cliente_id")
+    private Cliente cliente;
 
     // Campos para cliente manual
     @Column(name="cliente_nombre")
@@ -46,7 +55,6 @@ public class Remito {
 
     @PrePersist
     public void prePersist(){
-        // ✅ CAMBIO: Usar LocalDate.now() en lugar de LocalDateTime
         fecha = LocalDate.now();
         createdAt = updatedAt = LocalDateTime.now();
     }
@@ -56,16 +64,22 @@ public class Remito {
         updatedAt = LocalDateTime.now();
     }
 
-    // Getters y Setters
+    // =================== GETTERS Y SETTERS ===================
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
     public Long getNumero() { return numero; }
     public void setNumero(Long numero) { this.numero = numero; }
 
-    // ✅ CAMBIO: Retorna LocalDate
     public LocalDate getFecha() { return fecha; }
     public void setFecha(LocalDate fecha) { this.fecha = fecha; }
+
+    public Proveedor getProveedor() { return proveedor; }
+    public void setProveedor(Proveedor proveedor) { this.proveedor = proveedor; }
+
+    public Cliente getCliente() { return cliente; }
+    public void setCliente(Cliente cliente) { this.cliente = cliente; }
 
     public String getClienteNombre() { return clienteNombre; }
     public void setClienteNombre(String clienteNombre) { this.clienteNombre = clienteNombre; }
