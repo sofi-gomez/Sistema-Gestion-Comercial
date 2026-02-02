@@ -1636,3 +1636,19 @@ select.modern-input {
     color: white;
     font-weight: 600;
 }
+
+/* Remitos – items dentro de la tabla */
+.product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.items-resumen {
+    font-size: 0.9rem;
+    color: #475569;
+}
+
+.stock-badge {
+    align-self: flex-start;
+}
