@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { FiPlus, FiFileText, FiSearch, FiFilter, FiDownload, FiEdit2 } from "react-icons/fi";
 import RemitoFormModal from "../components/RemitoFormModal";
+import ItemsTooltip from "../components/ItemsTooltip";
 import "../index.css";
 
 export default function RemitosPage() {
@@ -212,19 +213,27 @@ export default function RemitosPage() {
                     <td className="sku-cell">
                       <span className="sku-badge">#{remito.numero}</span>
                     </td>
-                    <td className="unit-cell">
-                      {remito.fecha ? new Date(remito.fecha).toLocaleDateString() : "-"}
-                    </td>
-                    <td className="product-cell">
-                      <div className="product-info">
-                        <p>{remito.clienteNombre || "Sin cliente"}</p>
-                      </div>
-                    </td>
-                    <td className="unit-cell">
-                      <span className="stock-badge in-stock">
-                        {remito.items?.length || 0}
-                      </span>
-                    </td>
+                      <td className="unit-cell">
+                          {remito.fecha ? new Date(remito.fecha).toLocaleDateString() : "-"}
+                      </td>
+
+                      <td className="product-cell">
+                          <div className="product-info">
+                              <p>{remito.clienteNombre || "Sin cliente"}</p>
+                          </div>
+                      </td>
+
+                      <td className="product-cell">
+                          <div className="product-info">
+        <span className="stock-badge in-stock">
+            {remito.items?.length || 0}
+        </span>
+                              <p>
+                                  <ItemsTooltip items={remito.items || []} />
+                              </p>
+                          </div>
+                      </td>
+
                     <td className="actions-cell">
                       <div className="action-buttons">
                         <button
