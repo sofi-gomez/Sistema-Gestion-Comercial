@@ -18,4 +18,9 @@ public class CompraController {
     public Compra registrarCompra(@RequestBody Compra compra) {
         return compraService.registrarCompra(compra);
     }
+
+    @GetMapping("/proveedor/{proveedorId}")
+    public java.util.List<Compra> listarPorProveedor(@PathVariable Long proveedorId) {
+        return compraService.listarPorProveedor(proveedorId);
+    }
 }

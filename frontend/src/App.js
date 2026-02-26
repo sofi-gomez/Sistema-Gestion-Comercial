@@ -1,12 +1,11 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route} from "react-router-dom";
-import HomePage from "./pages/Homepage"; // Verificar casing
-import ClientesPage from "./pages/Clientespage"; // Con P mayúscula
-import MercaderiaPage from "./pages/Mercaderiapage"; // Verificar casing
-import ProveedoresPage from './pages/Proveedorespage'; // Verificar casing
-import VentasPage from './pages/Ventaspage'; // Verificar casing
-import TesoreriaPage from './pages/Tesoreriapage'; // Verificar casing
-import RemitosPage from './pages/Remitospage'; // Verificar casing
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import HomePage from "./pages/Homepage";
+import ClientesPage from "./pages/Clientespage";
+import MercaderiaPage from "./pages/Mercaderiapage";
+import ProveedoresPage from './pages/Proveedorespage';
+import TesoreriaPage from './pages/Tesoreriapage';
+import RemitosPage from './pages/Remitospage';
 
 function App() {
   return (
@@ -16,7 +15,6 @@ function App() {
         <Route path="/clientes" element={<ClientesPage />} />
         <Route path="/mercaderia" element={<MercaderiaPage />} />
         <Route path="/proveedores" element={<ProveedoresPage />} />
-        <Route path="/ventas" element={<VentasPage />} />
         <Route path="/tesoreria" element={<TesoreriaPage />} />
         <Route path="/remitos" element={<RemitosPage />} />
       </Routes>

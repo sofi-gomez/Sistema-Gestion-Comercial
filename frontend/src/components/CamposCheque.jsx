@@ -2,21 +2,21 @@ import React from "react";
 
 /**
  * Componente reutilizable para campos de cheque
- * Se usa tanto en VentaFormModal como en MovimientoFormModal
+ * Se usa tanto en RemitoFormModal como en MovimientoFormModal
  */
 export default function CamposCheque({
-                                         banco,
-                                         setBanco,
-                                         numeroCheque,
-                                         setNumeroCheque,
-                                         librador,
-                                         setLibrador,
-                                         fechaEmision,
-                                         setFechaEmision,
-                                         fechaCobro,
-                                         setFechaCobro,
-                                         mostrar
-                                     }) {
+    banco,
+    setBanco,
+    numeroCheque,
+    setNumeroCheque,
+    librador,
+    setLibrador,
+    fechaEmision,
+    setFechaEmision,
+    fechaCobro,
+    setFechaCobro,
+    mostrar
+}) {
 
     if (!mostrar) return null;
 

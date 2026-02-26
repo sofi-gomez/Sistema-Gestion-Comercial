@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -25,70 +26,156 @@ public class RemitoService {
 
     private final RemitoRepository remitoRepository;
     private final RemitoItemRepository remitoItemRepository;
+    private final ProductoService productoService;
 
     public RemitoService(RemitoRepository remitoRepository,
-                         RemitoItemRepository remitoItemRepository) {
+            RemitoItemRepository remitoItemRepository,
+            ProductoService productoService) {
         this.remitoRepository = remitoRepository;
         this.remitoItemRepository = remitoItemRepository;
+        this.productoService = productoService;
     }
 
-    // --- Métodos que el controlador espera ----------------
     public List<Remito> listarTodos() {
         return remitoRepository.findAll();
+    }
+
+    public List<Remito> listarPorEstado(Remito.EstadoRemito estado) {
+        return remitoRepository.findByEstadoOrderByFechaDesc(estado);
+    }
+
+    public List<Remito> listarPorCliente(Long clienteId) {
+        return remitoRepository.findByClienteIdOrderByFechaDesc(clienteId);
     }
 
     public Optional<Remito> buscarPorId(Long id) {
         return remitoRepository.findById(id);
     }
 
-    // --- NUEVO MÉTODO PARA ACTUALIZAR ---
+    /**
+     * Crea un remito PENDIENTE y descuenta el stock inmediatamente.
+     * REGLA: el stock se descuenta al entregar la mercadería, no al cobrar.
+     */
     @Transactional
-    public Remito actualizarRemito(Remito remito) {
-        // Verificar que el remito existe
-        Remito remitoExistente = remitoRepository.findById(remito.getId())
-                .orElseThrow(() -> new RuntimeException("Remito no encontrado"));
+    public Remito generarRemito(Remito remito) {
+        Long max = remitoRepository.findMaxNumero();
+        remito.setNumero((max != null && max > 0) ? max + 1 : 1L);
+        remito.setEstado(Remito.EstadoRemito.PENDIENTE);
 
-        // Mantener el número original (no cambiar la numeración al actualizar)
-        remito.setNumero(remitoExistente.getNumero());
-
-        // Eliminar los items existentes antes de agregar los nuevos
-        remitoItemRepository.deleteByRemitoId(remito.getId());
-
-        // Asociar los nuevos items con el remito
         if (remito.getItems() != null) {
             for (RemitoItem item : remito.getItems()) {
                 item.setRemito(remito);
-                // Asegurar que el ID del item sea null para que se cree como nuevo
-                item.setId(null);
             }
         }
 
-        // Actualizar fecha de modificación
-        remito.preUpdate();
+        Remito saved = remitoRepository.save(remito);
 
-        // Guardar el remito actualizado
+        // Descontar stock al momento de crear el remito
+        if (saved.getItems() != null) {
+            for (RemitoItem item : saved.getItems()) {
+                if (item.getProducto() != null && item.getCantidad() != null) {
+                    productoService.descontarStock(
+                            item.getProducto().getId(),
+                            item.getCantidad().intValue());
+                }
+            }
+        }
+        return saved;
+    }
+
+    /**
+     * Valoriza un remito: asigna precio por ítem, calcula total,
+     * guarda la cotización dólar y cambia estado a VALORIZADO.
+     *
+     * @param remitoId        ID del remito
+     * @param precios         Mapa itemId -> precioUnitario
+     * @param cotizacionDolar Cotización del dólar vigente (puede ser null)
+     */
+    @Transactional
+    public Remito valorizar(Long remitoId, Map<Long, BigDecimal> precios, BigDecimal cotizacionDolar) {
+        Remito remito = remitoRepository.findById(remitoId)
+                .orElseThrow(() -> new RuntimeException("Remito no encontrado: " + remitoId));
+
+        if (remito.getEstado() == Remito.EstadoRemito.COBRADO) {
+            throw new IllegalStateException("No se puede valorizar un remito ya cobrado");
+        }
+
+        BigDecimal total = BigDecimal.ZERO;
+        for (RemitoItem item : remito.getItems()) {
+            BigDecimal precio = precios.get(item.getId());
+            if (precio == null) {
+                throw new IllegalArgumentException("Falta precio para el ítem ID: " + item.getId());
+            }
+            BigDecimal subtotal = precio.multiply(item.getCantidad());
+            item.setPrecioUnitario(precio);
+            item.setSubtotal(subtotal);
+            total = total.add(subtotal);
+        }
+
+        remito.setTotal(total);
+        remito.setCotizacionDolar(cotizacionDolar);
+        remito.setFechaValorizacion(LocalDateTime.now());
+        remito.setEstado(Remito.EstadoRemito.VALORIZADO);
+
+        return remitoRepository.save(remito);
+    }
+
+    /**
+     * Revisa si el total cobrado en este remito lo liquida completamente.
+     * Llamado por CobroService después de cada cobro.
+     */
+    @Transactional
+    public void actualizarEstadoPostCobro(Remito remito, BigDecimal totalCobradoEnRemito) {
+        if (remito.getTotal() != null
+                && totalCobradoEnRemito.compareTo(remito.getTotal()) >= 0) {
+            remito.setEstado(Remito.EstadoRemito.COBRADO);
+            remitoRepository.save(remito);
+        }
+    }
+
+    @Transactional
+    public Remito marcarComoCobrado(Long id) {
+        Remito remito = remitoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Remito no encontrado: " + id));
+        remito.setEstado(Remito.EstadoRemito.COBRADO);
         return remitoRepository.save(remito);
     }
 
     @Transactional
-    public Remito generarRemito(Remito remito) {
-        // numeración automática (similar a lo que hiciste para ventas)
-        Long max = remitoRepository.findMaxNumero();
-        Long numero = (max != null && max > 0) ? max + 1 : 1L;
-        remito.setNumero(numero);
+    public void eliminarRemito(Long id) {
+        Remito remito = remitoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Remito no encontrado"));
 
-        // asociar items -> importante para que remito_id no quede null al persistir
+        // Revertir stock
         if (remito.getItems() != null) {
             for (RemitoItem item : remito.getItems()) {
-                item.setRemito(remito);
+                if (item.getProducto() != null && item.getCantidad() != null) {
+                    // Restar la cantidad negativa = sumar al stock
+                    productoService.descontarStock(
+                            item.getProducto().getId(),
+                            item.getCantidad().negate().intValue());
+                }
             }
         }
 
-        // persistir (cascade ALL en Remito.items debe salvar los items)
-        Remito saved = remitoRepository.save(remito);
-        return saved;
+        remitoRepository.delete(remito);
     }
-    // -------------------------------------------------------
+
+    @Transactional
+    public Remito actualizarRemito(Remito remito) {
+        Remito remitoExistente = remitoRepository.findById(remito.getId())
+                .orElseThrow(() -> new RuntimeException("Remito no encontrado"));
+        remito.setNumero(remitoExistente.getNumero());
+        remitoItemRepository.deleteByRemitoId(remito.getId());
+        if (remito.getItems() != null) {
+            for (RemitoItem item : remito.getItems()) {
+                item.setRemito(remito);
+                item.setId(null);
+            }
+        }
+        remito.preUpdate();
+        return remitoRepository.save(remito);
+    }
 
     public void generarPdfRemito(Remito remito, OutputStream os, byte[] logoBytes) throws Exception {
         try (PDDocument doc = new PDDocument()) {
@@ -117,14 +204,14 @@ public class RemitoService {
             // Título "REMITO" centrado
             cs.beginText();
             cs.setFont(PDType1Font.HELVETICA_BOLD, 24);
-            cs.newLineAtOffset(w/2 - 40, y - 30);
+            cs.newLineAtOffset(w / 2 - 40, y - 30);
             cs.showText("REMITO");
             cs.endText();
 
             // Número de remito
             cs.beginText();
             cs.setFont(PDType1Font.HELVETICA_BOLD, 14);
-            cs.newLineAtOffset(w/2 - 20, y - 55);
+            cs.newLineAtOffset(w / 2 - 20, y - 55);
             cs.showText("N° " + remito.getNumero());
             cs.endText();
 
@@ -156,11 +243,12 @@ public class RemitoService {
             // Información del cliente en formato de tabla limpia
             float infoStartY = y - 25;
             String[][] clienteData = {
-                    {"Nombre:", safeString(remito.getClienteNombre())},
-                    {"Dirección:", safeString(remito.getClienteDireccion())},
-                    {"Código Postal:", safeString(remito.getClienteCodigoPostal())},
-                    {"Condición IVA:", safeString(remito.getClienteAclaracion()).isEmpty() ?
-                            "Consumidor Final" : formatCondicionIva(remito.getClienteAclaracion())}
+                    { "Nombre:", safeString(remito.getClienteNombre()) },
+                    { "Dirección:", safeString(remito.getClienteDireccion()) },
+                    { "Código Postal:", safeString(remito.getClienteCodigoPostal()) },
+                    { "Condición IVA:",
+                            safeString(remito.getClienteAclaracion()).isEmpty() ? "Consumidor Final"
+                                    : formatCondicionIva(remito.getClienteAclaracion()) }
             };
 
             float labelX = x;
@@ -197,7 +285,7 @@ public class RemitoService {
             float tableTop = infoStartY - 20;
 
             // Header de la tabla
-            cs.setNonStrokingColor(240/255f, 240/255f, 240/255f);
+            cs.setNonStrokingColor(240 / 255f, 240 / 255f, 240 / 255f);
             cs.addRect(x, tableTop - 25, w - 2 * margin, 25);
             cs.fill();
             cs.setNonStrokingColor(0, 0, 0);
@@ -243,7 +331,8 @@ public class RemitoService {
 
                     // Descripción
                     String desc = (it.getProducto() != null && it.getProducto().getNombre() != null)
-                            ? it.getProducto().getNombre() : safeString(it.getNotas());
+                            ? it.getProducto().getNombre()
+                            : safeString(it.getNotas());
                     cs.beginText();
                     cs.setFont(PDType1Font.HELVETICA, 10);
                     cs.newLineAtOffset(colDescX, rowY - 15);
@@ -321,7 +410,7 @@ public class RemitoService {
             // Aclaración final centrada
             cs.beginText();
             cs.setFont(PDType1Font.HELVETICA_BOLD, 8);
-            cs.newLineAtOffset(w/2 - 120, 40);
+            cs.newLineAtOffset(w / 2 - 120, 40);
             cs.showText("PRECIOS EN PESOS ARGENTINOS - DOCUMENTO NO VÁLIDO COMO FACTURA");
             cs.endText();
 
@@ -354,7 +443,8 @@ public class RemitoService {
 
     // Método helper para formatear cantidades
     private String formatCantidad(BigDecimal cantidad) {
-        if (cantidad == null) return "0";
+        if (cantidad == null)
+            return "0";
         if (cantidad.stripTrailingZeros().scale() <= 0) {
             return cantidad.toBigInteger().toString();
         }
@@ -364,7 +454,7 @@ public class RemitoService {
     // Método helper para dividir texto en líneas
     private String[] splitText(String text, int maxLength) {
         if (text.length() <= maxLength) {
-            return new String[]{text};
+            return new String[] { text };
         }
         java.util.List<String> lines = new java.util.ArrayList<>();
         int start = 0;

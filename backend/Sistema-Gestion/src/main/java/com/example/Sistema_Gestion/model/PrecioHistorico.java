@@ -12,25 +12,40 @@ public class PrecioHistorico {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Relación ManyToOne con Producto
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "producto_id", nullable = false)
     private Producto producto;
+
+    /**
+     * Proveedor que vendió el producto a ese precio (nullable = precio de venta)
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "proveedor_id")
+    private Proveedor proveedor;
 
     @Column(name = "fecha", nullable = false)
     private LocalDateTime fecha = LocalDateTime.now();
 
     @Column(name = "precio", nullable = false)
-    private BigDecimal precio; // <- cambiar Double por BigDecimal
+    private BigDecimal precio;
 
     @Column(name = "fuente", length = 150)
     private String fuente;
 
     // ---------- Constructores ----------
-    public PrecioHistorico() {}
+    public PrecioHistorico() {
+    }
 
     public PrecioHistorico(Producto producto, BigDecimal precio, String fuente) {
         this.producto = producto;
+        this.precio = precio;
+        this.fuente = fuente;
+        this.fecha = LocalDateTime.now();
+    }
+
+    public PrecioHistorico(Producto producto, Proveedor proveedor, BigDecimal precio, String fuente) {
+        this.producto = producto;
+        this.proveedor = proveedor;
         this.precio = precio;
         this.fuente = fuente;
         this.fecha = LocalDateTime.now();
@@ -51,6 +66,14 @@ public class PrecioHistorico {
 
     public void setProducto(Producto producto) {
         this.producto = producto;
+    }
+
+    public Proveedor getProveedor() {
+        return proveedor;
+    }
+
+    public void setProveedor(Proveedor proveedor) {
+        this.proveedor = proveedor;
     }
 
     public LocalDateTime getFecha() {

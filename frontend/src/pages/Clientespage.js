@@ -1,229 +1,174 @@
 import React, { useEffect, useState } from "react";
-import { FiPlus, FiEdit2, FiTrash2, FiUser, FiSearch, FiFilter } from "react-icons/fi";
+import { FiPlus, FiUser, FiSearch, FiArrowLeft, FiDollarSign, FiFileText, FiEdit2, FiPhone, FiMail, FiMapPin, FiExternalLink } from "react-icons/fi";
 import ClienteFormModal from "../components/ClienteFormModal";
+import ClienteCtaCteSection from "../components/ClienteCtaCteSection";
+import ClienteRemitosSection from "../components/ClienteRemitosSection";
+import Toast from "../components/Toast";
 import "../index.css";
+
+const API = "http://localhost:8080/api/clientes";
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-
-  const API = "http://localhost:8080/api/clientes";
+  const [selectedCliente, setSelectedCliente] = useState(null);
+  const [activeTab, setActiveTab] = useState("ctacte");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [toast, setToast] = useState(null);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
       const res = await fetch(API);
-      const data = await res.json();
-      setClientes(data || []);
-    } catch (e) {
-      console.error(e);
-      setClientes([]);
-    } finally {
-      setLoading(false);
-    }
+      setClientes(await res.json() || []);
+    } catch (e) { setClientes([]); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchAll(); }, []);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("¿Eliminar cliente?")) return;
-    try {
-      await fetch(`${API}/${id}`, { method: "DELETE" });
-      fetchAll();
-    } catch (error) {
-      alert("Error al eliminar cliente");
-    }
-  };
+  const filteredClientes = clientes.filter(c =>
+    c.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.documento?.includes(searchTerm)
+  );
 
-  const handleSave = async (cliente) => {
-    const method = cliente.id ? "PUT" : "POST";
-    const url = cliente.id ? `${API}/${cliente.id}` : API;
-    
+  // Detail View (Only for Cta Cte and Remitos)
+  if (selectedCliente) {
+    return (
+      <div className="mercaderia-container">
+        <div className="page-header" style={{ marginBottom: "1.5rem" }}>
+          <div className="header-content">
+            <div className="header-title">
+              <button className="icon-btn" onClick={() => setSelectedCliente(null)} style={{ marginRight: "1rem" }}>
+                <FiArrowLeft />
+              </button>
+              <div className="title-icon"><FiUser /></div>
+              <div>
+                <h1>{selectedCliente.nombre}</h1>
+                <p>{selectedCliente.documento || "Sin documento"}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="tabs-container" style={{ display: "flex", gap: "10px", marginBottom: "20px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
+          <button className={`tab-btn ${activeTab === "ctacte" ? "active" : ""}`} onClick={() => setActiveTab("ctacte")}><FiDollarSign /> Cuenta Corriente</button>
+          <button className={`tab-btn ${activeTab === "remitos" ? "active" : ""}`} onClick={() => setActiveTab("remitos")}><FiFileText /> Historial Remitos</button>
+        </div>
+
+        <div className="tab-content">
+          {activeTab === "ctacte" && <ClienteCtaCteSection clienteId={selectedCliente.id} />}
+          {activeTab === "remitos" && <ClienteRemitosSection clienteId={selectedCliente.id} />}
+        </div>
+      </div>
+    );
+  }
+
+  const handleSave = async (payload) => {
     try {
-      await fetch(url, {
+      const method = payload.id ? "PUT" : "POST";
+      const url = payload.id ? `${API}/${payload.id}` : API;
+      const res = await fetch(url, {
         method,
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify(cliente),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
-      setModalOpen(false);
-      setEditing(null);
-      fetchAll();
-    } catch (error) {
-      alert("Error al guardar cliente");
+      if (res.ok) {
+        setModalOpen(false);
+        setSelectedCliente(null);
+        fetchAll();
+        setToast({
+          title: payload.id ? "Cliente actualizado" : "Cliente creado",
+          message: `El cliente ${payload.nombre} se guardó correctamente.`,
+          type: "success"
+        });
+      } else {
+        alert("Error al guardar: " + await res.text());
+      }
+    } catch (e) {
+      alert("Error de conexión");
     }
   };
-
-  // Filtrar clientes
-  const filteredClientes = clientes.filter(cliente => {
-    return cliente.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           cliente.documento?.includes(searchTerm) ||
-           cliente.email?.toLowerCase().includes(searchTerm.toLowerCase());
-  });
 
   return (
     <div className="mercaderia-container">
-      {/* Header de la página */}
       <div className="page-header">
         <div className="header-content">
           <div className="header-title">
-            <div className="title-icon">
-              <FiUser />
-            </div>
+            <div className="title-icon"><FiUser /></div>
             <div>
               <h1>Gestión de Clientes</h1>
-              <p>Administrá la información de tus clientes</p>
+              <p>Listado completo con información de contacto y fiscal</p>
             </div>
           </div>
-          <button
-            onClick={() => { setEditing(null); setModalOpen(true); }}
-            className="btn-primary"
-          >
-            <FiPlus />
-            Nuevo Cliente
-          </button>
+          <button onClick={() => { setSelectedCliente(null); setModalOpen(true); }} className="btn-primary"><FiPlus /> Nuevo Cliente</button>
         </div>
       </div>
 
-      {/* Panel de estadísticas */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon total">
-            <FiUser />
-          </div>
-          <div className="stat-info">
-            <h3>{clientes.length}</h3>
-            <p>Total Clientes</p>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon active">
-            <FiUser />
-          </div>
-          <div className="stat-info">
-            <h3>{clientes.filter(c => c.email).length}</h3>
-            <p>Con Email</p>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon stock">
-            <FiUser />
-          </div>
-          <div className="stat-info">
-            <h3>{clientes.filter(c => c.telefono).length}</h3>
-            <p>Con Teléfono</p>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon out-of-stock">
-            <FiUser />
-          </div>
-          <div className="stat-info">
-            <h3>{clientes.filter(c => c.documento).length}</h3>
-            <p>Con Documento</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Barra de búsqueda */}
       <div className="filters-bar">
-        <div className="search-container">
-          <div className="search-box">
-            <FiSearch className="search-icon" />
-            <input
-              type="text"
-              placeholder="Buscar clientes por nombre, documento o email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-          </div>
-          <button 
-            className={`filter-toggle ${showFilters ? 'active' : ''}`}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <FiFilter />
-            Filtros
-          </button>
+        <div className="search-box">
+          <FiSearch className="search-icon" />
+          <input
+            type="text"
+            placeholder="Buscar cliente por nombre o documento..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
         </div>
       </div>
 
-      {/* Tabla de clientes */}
       <div className="table-container">
-        {loading ? (
-          <div className="loading-state">
-            <div className="loading-spinner"></div>
-            <p>Cargando clientes...</p>
-          </div>
-        ) : filteredClientes.length === 0 ? (
-          <div className="empty-state">
-            <FiUser />
-            <h3>No se encontraron clientes</h3>
-            <p>{searchTerm ? 'Intenta ajustar los términos de búsqueda' : 'Comienza agregando tu primer cliente'}</p>
-            {!searchTerm && (
-              <button
-                onClick={() => { setEditing(null); setModalOpen(true); }}
-                className="btn-primary"
-              >
-                <FiPlus />
-                Agregar Primer Cliente
-              </button>
-            )}
-          </div>
-        ) : (
+        {loading ? <div className="loading-spinner" /> : (
           <div className="table-wrapper">
             <table className="modern-table">
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Documento</th>
-                  <th>Teléfono</th>
-                  <th>Email</th>
+                  <th>Cliente / Fiscal</th>
+                  <th>Contacto</th>
                   <th>Dirección</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredClientes.map(cliente => (
-                  <tr key={cliente.id}>
-                    <td className="product-cell">
+                {filteredClientes.map(c => (
+                  <tr key={c.id}>
+                    <td>
                       <div className="product-info">
-                        <h4>{cliente.nombre}</h4>
-                        {cliente.notas && (
-                          <p>{cliente.notas}</p>
-                        )}
+                        <h4>{c.nombre}</h4>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
+                          <span className="sku-badge" style={{ fontSize: "0.75rem" }}>{c.documento || "SIN DOC."}</span>
+                        </div>
                       </div>
                     </td>
-                    <td className="sku-cell">
-                      <span className="sku-badge">{cliente.documento || '-'}</span>
+                    <td>
+                      <div style={{ fontSize: "0.9rem", color: "var(--text)" }}>
+                        <p style={{ display: "flex", alignItems: "center", gap: "6px", margin: 0 }}><FiPhone size={14} color="var(--muted)" /> {c.telefono || "-"}</p>
+                        <p style={{ display: "flex", alignItems: "center", gap: "6px", margin: "4px 0 0 0" }}><FiMail size={14} color="var(--muted)" /> {c.email || "-"}</p>
+                      </div>
                     </td>
-                    <td className="unit-cell">
-                      {cliente.telefono || '-'}
-                    </td>
-                    <td className="unit-cell">
-                      {cliente.email || '-'}
-                    </td>
-                    <td className="unit-cell">
-                      {cliente.direccion || '-'}
+                    <td style={{ maxWidth: "250px" }}>
+                      <p style={{ display: "flex", alignItems: "flex-start", gap: "6px", fontSize: "0.9rem", margin: 0 }}>
+                        <FiMapPin size={14} color="var(--muted)" style={{ marginTop: "3px" }} />
+                        <span>{c.direccion || "-"}</span>
+                      </p>
                     </td>
                     <td className="actions-cell">
-                      <div className="action-buttons">
+                      <div style={{ display: "flex", gap: "8px" }}>
                         <button
-                          onClick={() => { setEditing(cliente); setModalOpen(true); }}
                           className="icon-btn edit"
-                          title="Editar"
+                          onClick={() => { setSelectedCliente(c); setModalOpen(true); }}
+                          title="Editar información"
                         >
                           <FiEdit2 />
                         </button>
                         <button
-                          onClick={() => handleDelete(cliente.id)}
-                          className="icon-btn delete"
-                          title="Eliminar"
+                          className="btn-primary"
+                          style={{ padding: "6px 12px", fontSize: "0.85rem", gap: "6px" }}
+                          onClick={() => { setSelectedCliente(c); setActiveTab("ctacte"); }}
                         >
-                          <FiTrash2 />
+                          <FiDollarSign /> Cuenta e Historial
                         </button>
                       </div>
                     </td>
@@ -237,11 +182,40 @@ export default function ClientesPage() {
 
       {modalOpen && (
         <ClienteFormModal
-          cliente={editing}
-          onClose={() => { setModalOpen(false); setEditing(null); }}
+          cliente={selectedCliente}
+          onClose={() => { setModalOpen(false); setSelectedCliente(null); }}
           onSave={handleSave}
         />
       )}
+
+      {toast && (
+        <div className="toast-container">
+          <Toast
+            title={toast.title}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        </div>
+      )}
+
+      <style>{`
+                .tab-btn {
+                    padding: 10px 16px;
+                    border: none;
+                    background: transparent;
+                    color: var(--muted);
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-weight: 500;
+                    border-radius: 8px;
+                    transition: all 0.2s;
+                }
+                .tab-btn:hover { background: var(--bg); color: var(--text); }
+                .tab-btn.active { background: #e8f5e9; color: #2e7d32; }
+            `}</style>
     </div>
   );
 }
