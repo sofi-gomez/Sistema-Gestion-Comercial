@@ -4,6 +4,7 @@ import "../index.css";
 
 export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
     const [form, setForm] = useState({
+        tipo: "SALIDA", // ✅ NUEVO
         fecha: "",
         proveedor: null,
         cliente: null,
@@ -70,6 +71,7 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
 
         if (remito) {
             setForm({
+                tipo: remito.tipo || "SALIDA", // ✅ CARGAR TIPO
                 fecha: formatDateForInput(remito.fecha) || "",
                 proveedor: remito.proveedor ?? null,
                 cliente: remito.cliente ?? null,
@@ -89,6 +91,7 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
             const hoy = new Date().toISOString().split('T')[0];
             setForm(prev => ({
                 ...prev,
+                tipo: "SALIDA", // ✅ TIPO POR DEFECTO
                 fecha: hoy,
                 proveedor: null,
                 cliente: null,
@@ -143,6 +146,7 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
             clienteAclaracion: c.condicionIva || ""
         }));
     };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -160,6 +164,7 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
         }
 
         const payload = {
+            tipo: form.tipo, // ✅ INCLUIR TIPO EN PAYLOAD
             fecha: form.fecha || null,
             proveedor: form.proveedor ? { id: form.proveedor.id } : null,
             cliente: form.cliente ? { id: form.cliente.id } : null,
@@ -224,41 +229,12 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
                     <div className="modal-content">
                         <div className="form-grid">
 
-                            {/* CAMPO FECHA AGREGADO */}
-                            <div className="form-group">
-                                <label className="form-label">Fecha *</label>
-                                <input
-                                    type="date"
-                                    className="modern-input"
-                                    value={form.fecha || ""}
-                                    onChange={e => setForm(prev => ({ ...prev, fecha: e.target.value }))}
-                                    required
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Proveedor</label>
-                                <select
-                                    className="modern-input"
-                                    value={form.proveedor?.id || ""}
-                                    onChange={e => handleProveedorChange(e.target.value)}
-                                    required
-                                >
-                                    <option value="">-- Seleccionar proveedor --</option>
-                                    {proveedores.map(p => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.nombre}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
                             <div className="form-group full-width">
-                                <label className="form-label">Cliente *</label>
+                                <label className="form-label">Cliente</label>
                                 <select
                                     className="modern-input"
                                     value={form.cliente?.id || ""}
                                     onChange={e => handleClienteChange(e.target.value)}
-                                    required
                                 >
                                     <option value="">-- Seleccionar cliente --</option>
                                     {clientes.map(c => (
@@ -349,8 +325,8 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
                                             <input
                                                 className="modern-input"
                                                 type="number"
-                                                step="0.0001"
-                                                min="0.0001"
+                                                step="1"
+                                                min="1"
                                                 value={it.cantidad}
                                                 onChange={e => updateItem(idx, "cantidad", e.target.value)}
                                                 placeholder="Cantidad"

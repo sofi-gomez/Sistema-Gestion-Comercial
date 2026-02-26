@@ -19,8 +19,8 @@ public class CompraService {
     private final ProductoService productoService;
 
     public CompraService(CompraRepository compraRepository,
-                         CompraItemRepository compraItemRepository,
-                         @Lazy ProductoService productoService) {
+            CompraItemRepository compraItemRepository,
+            @Lazy ProductoService productoService) {
         this.compraRepository = compraRepository;
         this.compraItemRepository = compraItemRepository;
         this.productoService = productoService;
@@ -49,6 +49,10 @@ public class CompraService {
 
     public Optional<Compra> buscarPorId(Long id) {
         return compraRepository.findById(id);
+    }
+
+    public List<Compra> listarPorProveedor(Long proveedorId) {
+        return compraRepository.findByProveedorIdOrderByFechaDesc(proveedorId);
     }
 
     @Transactional

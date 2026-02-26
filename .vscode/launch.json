@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot - SistemaGestion",
+            "request": "launch",
+            "mainClass": "com.example.Sistema_Gestion.SistemaGestionApplication",
+            "projectName": "Sistema-Gestion"
+        }
+    ]
+}
