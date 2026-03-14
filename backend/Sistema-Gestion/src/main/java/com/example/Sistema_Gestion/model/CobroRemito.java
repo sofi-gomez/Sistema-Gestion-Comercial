@@ -17,12 +17,12 @@ public class CobroRemito {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "cobro_id", nullable = false)
     @JsonBackReference("cobro-remitos")
     private Cobro cobro;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "remito_id", nullable = false)
     private Remito remito;
 

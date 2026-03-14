@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -16,4 +17,10 @@ public interface PagoProveedorRepository extends JpaRepository<PagoProveedor, Lo
     /** Total pagado a un proveedor (no anulados) */
     @Query("SELECT COALESCE(SUM(p.importe), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false")
     BigDecimal totalPagadoPorProveedor(@Param("proveedorId") Long proveedorId);
+
+    List<PagoProveedor> findByProveedorIdAndFechaBetweenOrderByFechaAsc(Long proveedorId, LocalDate desde,
+            LocalDate hasta);
+
+    @Query("SELECT COALESCE(SUM(p.importe), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND p.fecha < :fecha")
+    BigDecimal totalPagadoAntesDe(@Param("proveedorId") Long proveedorId, @Param("fecha") LocalDate fecha);
 }

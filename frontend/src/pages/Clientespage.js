@@ -1,26 +1,30 @@
-import React, { useEffect, useState } from "react";
-import { FiPlus, FiUser, FiSearch, FiArrowLeft, FiDollarSign, FiFileText, FiEdit2, FiPhone, FiMail, FiMapPin, FiExternalLink } from "react-icons/fi";
-import ClienteFormModal from "../components/ClienteFormModal";
+import React, { useState, useEffect } from "react";
+import {
+  FiUser, FiSearch, FiEdit2, FiPlus, FiPhone, FiMail,
+  FiMapPin, FiFileText, FiArrowLeft, FiDollarSign
+} from "react-icons/fi";
 import ClienteCtaCteSection from "../components/ClienteCtaCteSection";
 import ClienteRemitosSection from "../components/ClienteRemitosSection";
+import ClienteFormModal from "../components/ClienteFormModal";
 import Toast from "../components/Toast";
-import "../index.css";
+import { apiFetch } from "../utils/api";
 
-const API = "http://localhost:8080/api/clientes";
+const API = "/api/clientes";
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCliente, setSelectedCliente] = useState(null);
-  const [activeTab, setActiveTab] = useState("ctacte");
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedCliente, setSelectedCliente] = useState(null);
+  const [viewDetail, setViewDetail] = useState(false);
+  const [activeTab, setActiveTab] = useState("ctacte");
   const [toast, setToast] = useState(null);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const res = await fetch(API);
+      const res = await apiFetch(API);
       setClientes(await res.json() || []);
     } catch (e) { setClientes([]); }
     finally { setLoading(false); }
@@ -33,50 +37,21 @@ export default function ClientesPage() {
     c.documento?.includes(searchTerm)
   );
 
-  // Detail View (Only for Cta Cte and Remitos)
-  if (selectedCliente) {
-    return (
-      <div className="mercaderia-container">
-        <div className="page-header" style={{ marginBottom: "1.5rem" }}>
-          <div className="header-content">
-            <div className="header-title">
-              <button className="icon-btn" onClick={() => setSelectedCliente(null)} style={{ marginRight: "1rem" }}>
-                <FiArrowLeft />
-              </button>
-              <div className="title-icon"><FiUser /></div>
-              <div>
-                <h1>{selectedCliente.nombre}</h1>
-                <p>{selectedCliente.documento || "Sin documento"}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="tabs-container" style={{ display: "flex", gap: "10px", marginBottom: "20px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
-          <button className={`tab-btn ${activeTab === "ctacte" ? "active" : ""}`} onClick={() => setActiveTab("ctacte")}><FiDollarSign /> Cuenta Corriente</button>
-          <button className={`tab-btn ${activeTab === "remitos" ? "active" : ""}`} onClick={() => setActiveTab("remitos")}><FiFileText /> Historial Remitos</button>
-        </div>
-
-        <div className="tab-content">
-          {activeTab === "ctacte" && <ClienteCtaCteSection clienteId={selectedCliente.id} />}
-          {activeTab === "remitos" && <ClienteRemitosSection clienteId={selectedCliente.id} />}
-        </div>
-      </div>
-    );
-  }
-
   const handleSave = async (payload) => {
     try {
       const method = payload.id ? "PUT" : "POST";
       const url = payload.id ? `${API}/${payload.id}` : API;
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
         setModalOpen(false);
-        setSelectedCliente(null);
+        if (!viewDetail) {
+          setSelectedCliente(null);
+        } else {
+          setSelectedCliente({ ...selectedCliente, ...payload });
+        }
         fetchAll();
         setToast({
           title: payload.id ? "Cliente actualizado" : "Cliente creado",
@@ -90,6 +65,63 @@ export default function ClientesPage() {
       alert("Error de conexión");
     }
   };
+
+  // Detail View (Only for Cta Cte and Remitos)
+  if (selectedCliente && viewDetail) {
+    return (
+      <div className="mercaderia-container">
+        <div className="page-header" style={{ marginBottom: "1.5rem" }}>
+          <div className="header-content">
+            <div className="header-title">
+              <button className="icon-btn" onClick={() => { setViewDetail(false); setSelectedCliente(null); }} style={{ marginRight: "1rem" }}>
+                <FiArrowLeft />
+              </button>
+              <div className="title-icon"><FiUser /></div>
+              <div>
+                <h1>{selectedCliente.nombre}</h1>
+                <p>{selectedCliente.documento || "Sin documento"}</p>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button className="icon-btn edit" onClick={() => setModalOpen(true)} title="Editar Cliente">
+                <FiEdit2 />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="tabs-container" style={{
+          display: "flex",
+          gap: "8px",
+          marginBottom: "24px",
+          paddingBottom: "12px",
+          borderBottom: "1px solid #e2e8f0"
+        }}>
+          <button className={`tab-btn-modern ${activeTab === "ctacte" ? "active" : ""}`} onClick={() => setActiveTab("ctacte")}><FiDollarSign /> Cuenta Corriente</button>
+          <button className={`tab-btn-modern ${activeTab === "remitos" ? "active" : ""}`} onClick={() => setActiveTab("remitos")}><FiFileText /> Historial Remitos</button>
+        </div>
+
+        <div className="tab-content">
+          {activeTab === "ctacte" && <ClienteCtaCteSection clienteId={selectedCliente.id} />}
+          {activeTab === "remitos" && <ClienteRemitosSection clienteId={selectedCliente.id} />}
+        </div>
+
+        {modalOpen && (
+          <ClienteFormModal
+            cliente={selectedCliente}
+            onClose={() => setModalOpen(false)}
+            onSave={handleSave}
+          />
+        )}
+
+        {toast && (
+          <div className="toast-container">
+            <Toast title={toast.title} message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="mercaderia-container">
@@ -128,6 +160,7 @@ export default function ClientesPage() {
                   <th>Cliente / Fiscal</th>
                   <th>Contacto</th>
                   <th>Dirección</th>
+                  <th>Notas</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -154,6 +187,18 @@ export default function ClientesPage() {
                         <span>{c.direccion || "-"}</span>
                       </p>
                     </td>
+                    <td style={{ maxWidth: "200px" }}>
+                      <p style={{ display: "flex", alignItems: "flex-start", gap: "6px", fontSize: "0.9rem", margin: 0, color: "var(--muted)" }}>
+                        <FiFileText size={14} style={{ marginTop: "3px", flexShrink: 0 }} />
+                        <span style={{
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis"
+                        }} title={c.notas || "Sin notas"}>
+                          {c.notas || "-"}
+                        </span>
+                      </p>
+                    </td>
                     <td className="actions-cell">
                       <div style={{ display: "flex", gap: "8px" }}>
                         <button
@@ -166,7 +211,7 @@ export default function ClientesPage() {
                         <button
                           className="btn-primary"
                           style={{ padding: "6px 12px", fontSize: "0.85rem", gap: "6px" }}
-                          onClick={() => { setSelectedCliente(c); setActiveTab("ctacte"); }}
+                          onClick={() => { setSelectedCliente(c); setViewDetail(true); setActiveTab("ctacte"); }}
                         >
                           <FiDollarSign /> Cuenta e Historial
                         </button>
@@ -199,23 +244,6 @@ export default function ClientesPage() {
         </div>
       )}
 
-      <style>{`
-                .tab-btn {
-                    padding: 10px 16px;
-                    border: none;
-                    background: transparent;
-                    color: var(--muted);
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    font-weight: 500;
-                    border-radius: 8px;
-                    transition: all 0.2s;
-                }
-                .tab-btn:hover { background: var(--bg); color: var(--text); }
-                .tab-btn.active { background: #e8f5e9; color: #2e7d32; }
-            `}</style>
     </div>
   );
 }

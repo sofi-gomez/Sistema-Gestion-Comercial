@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { FiDollarSign, FiSearch, FiCheckCircle, FiClock, FiFileText, FiX } from "react-icons/fi";
+import { FiDollarSign, FiCheckCircle, FiX } from "react-icons/fi";
 import Toast from "./Toast";
+import { formatDateLocal } from "../utils/dateUtils";
+import { apiFetch } from "../utils/api";
 
-const API_REMITOS = "http://localhost:8080/api/remitos";
+const API_REMITOS = "/api/remitos";
 
 export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
     const [remitos, setRemitos] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [selected, setSelected] = useState(initialRemito || null);
     const [precios, setPrecios] = useState({});
     const [cotizacion, setCotizacion] = useState("");
@@ -14,21 +15,29 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
     const [toast, setToast] = useState(null);
     const [currency, setCurrency] = useState("ARS");
 
+    const getSuggestedPrice = (item, cur) => {
+        if (cur === "USD") return item.producto?.precioVentaUSD?.toString() || "";
+        return item.producto?.precioVenta?.toString() || "";
+    };
+
+    const applyAllSuggestions = (items, cur) => {
+        const map = {};
+        items.forEach(i => { map[i.id] = getSuggestedPrice(i, cur); });
+        return map;
+    };
+
     useEffect(() => {
         if (initialRemito) {
-            const map = {};
-            initialRemito.items.forEach(i => map[i.id] = "");
-            setPrecios(map);
+            setPrecios(applyAllSuggestions(initialRemito.items, "ARS"));
             setSelected(initialRemito);
         }
     }, [initialRemito]);
 
     const fetchPendientes = async () => {
         try {
-            const res = await fetch(`${API_REMITOS}?estado=PENDIENTE`);
+            const res = await apiFetch(`${API_REMITOS}?estado=PENDIENTE`);
             setRemitos(await res.json());
         } catch (e) { console.error(e); }
-        finally { setLoading(false); }
     };
 
     useEffect(() => { fetchPendientes(); }, []);
@@ -48,9 +57,8 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                     Object.entries(precios).map(([k, v]) => [k, parseFloat(v) * tasa])
                 ),
             };
-            const res = await fetch(`${API_REMITOS}/${selected.id}/valorizar`, {
+            const res = await apiFetch(`${API_REMITOS}/${selected.id}/valorizar`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
             });
             if (res.ok) {
@@ -100,7 +108,11 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                                     <select
                                         className="modern-input"
                                         value={currency}
-                                        onChange={e => setCurrency(e.target.value)}
+                                        onChange={e => {
+                                            const cur = e.target.value;
+                                            setCurrency(cur);
+                                            if (selected) setPrecios(applyAllSuggestions(selected.items, cur));
+                                        }}
                                     >
                                         <option value="ARS">Pesos (ARS)</option>
                                         <option value="USD">Dólares (USD)</option>
@@ -116,6 +128,7 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                                             placeholder="0.00"
                                             value={cotizacion}
                                             onChange={e => setCotizacion(e.target.value)}
+                                            onWheel={(e) => e.target.blur()}
                                         />
                                     </div>
                                 )}
@@ -153,7 +166,25 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                                                                 style={{ paddingLeft: currency === "ARS" ? "25px" : "40px" }}
                                                                 value={precios[i.id]}
                                                                 onChange={e => setPrecios({ ...precios, [i.id]: e.target.value })}
+                                                                onWheel={(e) => e.target.blur()}
                                                             />
+                                                            {(() => {
+                                                                const suggested = getSuggestedPrice(i, currency);
+                                                                if (!suggested) return null;
+                                                                return (
+                                                                    <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                                                                        <span>Catálogo: {currency === "ARS" ? "$" : "USD"} {Number(suggested).toLocaleString()}</span>
+                                                                        {precios[i.id] !== suggested && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setPrecios({ ...precios, [i.id]: suggested })}
+                                                                                style={{ background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: "0.8rem", padding: 0 }}
+                                                                                title="Restaurar precio de catálogo"
+                                                                            >↺</button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -244,15 +275,13 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                             {remitos.map(r => (
                                 <tr key={r.id}>
                                     <td className="sku-cell"><span className="sku-badge">#{r.numero}</span></td>
-                                    <td>{new Date(r.fecha).toLocaleDateString()}</td>
+                                    <td>{formatDateLocal(r.fecha)}</td>
                                     <td>{r.clienteNombre}</td>
                                     <td>
                                         <button className="btn-primary" style={{ backgroundColor: "var(--success)" }} onClick={() => {
                                             setSelected(r);
                                             setCurrency("ARS"); // Reset a pesos al elegir uno nuevo
-                                            const map = {};
-                                            r.items.forEach(i => map[i.id] = "");
-                                            setPrecios(map);
+                                            setPrecios(applyAllSuggestions(r.items, "ARS"));
                                         }}>
                                             <FiDollarSign /> Valorizar
                                         </button>
@@ -278,7 +307,11 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                                     <select
                                         className="modern-input"
                                         value={currency}
-                                        onChange={e => setCurrency(e.target.value)}
+                                        onChange={e => {
+                                            const cur = e.target.value;
+                                            setCurrency(cur);
+                                            if (selected) setPrecios(applyAllSuggestions(selected.items, cur));
+                                        }}
                                     >
                                         <option value="ARS">Pesos (ARS)</option>
                                         <option value="USD">Dólares (USD)</option>
@@ -294,6 +327,7 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                                             placeholder="0.00"
                                             value={cotizacion}
                                             onChange={e => setCotizacion(e.target.value)}
+                                            onWheel={(e) => e.target.blur()}
                                         />
                                     </div>
                                 )}
@@ -331,7 +365,25 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                                                                 style={{ paddingLeft: currency === "ARS" ? "25px" : "40px" }}
                                                                 value={precios[i.id]}
                                                                 onChange={e => setPrecios({ ...precios, [i.id]: e.target.value })}
+                                                                onWheel={(e) => e.target.blur()}
                                                             />
+                                                            {(() => {
+                                                                const suggested = getSuggestedPrice(i, currency);
+                                                                if (!suggested) return null;
+                                                                return (
+                                                                    <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                                                                        <span>Catálogo: {currency === "ARS" ? "$" : "USD"} {Number(suggested).toLocaleString()}</span>
+                                                                        {precios[i.id] !== suggested && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setPrecios({ ...precios, [i.id]: suggested })}
+                                                                                style={{ background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: "0.8rem", padding: 0 }}
+                                                                                title="Restaurar precio de catálogo"
+                                                                            >↺</button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </td>
                                                 </tr>

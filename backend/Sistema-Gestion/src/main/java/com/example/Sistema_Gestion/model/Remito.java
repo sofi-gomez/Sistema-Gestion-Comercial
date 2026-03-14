@@ -12,12 +12,6 @@ import java.util.List;
 @Table(name = "remito")
 public class Remito {
 
-    // Tipo de remito (ENTRADA = proveedor, SALIDA = cliente)
-    public enum TipoRemito {
-        ENTRADA,
-        SALIDA
-    }
-
     // Estado del ciclo de vida del remito
     public enum EstadoRemito {
         PENDIENTE, // Mercadería entregada, sin precio
@@ -33,15 +27,6 @@ public class Remito {
     private Long numero;
 
     private LocalDate fecha;
-
-    // ✅ CAMPO TIPO agregado
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tipo", nullable = false)
-    private TipoRemito tipo = TipoRemito.SALIDA;
-
-    @ManyToOne
-    @JoinColumn(name = "proveedor_id")
-    private Proveedor proveedor;
 
     @ManyToOne
     @JoinColumn(name = "cliente_id")
@@ -83,7 +68,7 @@ public class Remito {
 
     // ===================================================
 
-    @OneToMany(mappedBy = "remito", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "remito", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonManagedReference
     private List<RemitoItem> items = new ArrayList<>();
 
@@ -92,7 +77,9 @@ public class Remito {
 
     @PrePersist
     public void prePersist() {
-        fecha = LocalDate.now();
+        if (fecha == null) {
+            fecha = LocalDate.now();
+        }
         createdAt = updatedAt = LocalDateTime.now();
     }
 
@@ -127,14 +114,6 @@ public class Remito {
         this.fecha = fecha;
     }
 
-    public TipoRemito getTipo() {
-        return tipo;
-    }
-
-    public void setTipo(TipoRemito tipo) {
-        this.tipo = tipo;
-    }
-
     public EstadoRemito getEstado() {
         return estado;
     }
@@ -165,14 +144,6 @@ public class Remito {
 
     public void setFechaValorizacion(LocalDateTime fechaValorizacion) {
         this.fechaValorizacion = fechaValorizacion;
-    }
-
-    public Proveedor getProveedor() {
-        return proveedor;
-    }
-
-    public void setProveedor(Proveedor proveedor) {
-        this.proveedor = proveedor;
     }
 
     public Cliente getCliente() {

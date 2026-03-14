@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,17 +33,20 @@ public class CobroService {
     private final RemitoRepository remitoRepository;
     private final RemitoService remitoService;
     private final TesoreriaService tesoreriaService;
+    private final ClienteRepository clienteRepository;
 
     public CobroService(CobroRepository cobroRepository,
             CobroRemitoRepository cobroRemitoRepository,
             RemitoRepository remitoRepository,
             RemitoService remitoService,
-            TesoreriaService tesoreriaService) {
+            TesoreriaService tesoreriaService,
+            ClienteRepository clienteRepository) {
         this.cobroRepository = cobroRepository;
         this.cobroRemitoRepository = cobroRemitoRepository;
         this.remitoRepository = remitoRepository;
         this.remitoService = remitoService;
         this.tesoreriaService = tesoreriaService;
+        this.clienteRepository = clienteRepository;
     }
 
     /**
@@ -59,12 +63,35 @@ public class CobroService {
             Map<Long, BigDecimal> importesPorRemito,
             List<CobroMedioPago> mediosPago) {
         // 1. Calcular y validar el total
-        BigDecimal sumaImportes = importesPorRemito.values().stream()
+        BigDecimal sumaAplicadaRemitos = importesPorRemito.values().stream()
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        cobro.setTotalCobrado(sumaImportes);
+
+        // Si se especificaron remitos, el total debe ser la suma de lo aplicado.
+        // Si no (cobro a cuenta), usamos el total ya seteado en el objeto cobro.
+        if (!importesPorRemito.isEmpty()) {
+            cobro.setTotalCobrado(sumaAplicadaRemitos);
+        } else if (cobro.getTotalCobrado() == null || cobro.getTotalCobrado().compareTo(BigDecimal.ZERO) <= 0) {
+            // Validar que si no hay remitos, al menos haya un monto total declarado.
+            BigDecimal sumaMedios = mediosPago != null ? mediosPago.stream()
+                    .map(CobroMedioPago::getImporte)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO;
+            cobro.setTotalCobrado(sumaMedios);
+        }
 
         if (cobro.getFecha() == null) {
             cobro.setFecha(LocalDate.now());
+        }
+
+        // Capturar nombre antes del save para evitar proxy Hibernate
+        String nombreCliente = "Cliente";
+        if (cobro.getCliente() != null) {
+            if (cobro.getCliente().getNombre() != null && !cobro.getCliente().getNombre().isEmpty()) {
+                nombreCliente = cobro.getCliente().getNombre();
+            } else if (cobro.getCliente().getId() != null) {
+                nombreCliente = clienteRepository.findById(cobro.getCliente().getId())
+                        .map(Cliente::getNombre)
+                        .orElse("Cliente");
+            }
         }
 
         // 2. Persistir el cobro principal
@@ -110,8 +137,9 @@ public class CobroService {
                 mov.setMedioPago(medio.getMedio()); // El modelo CobroMedioPago usa String para medio
                 mov.setImporte(medio.getImporte());
                 mov.setFecha(savedCobro.getFecha().atStartOfDay());
-                mov.setDescripcion("Cobro de Cliente: " + savedCobro.getCliente().getNombre());
+                mov.setDescripcion("Cobro de Cliente: " + nombreCliente);
                 mov.setReferencia("Cobro #" + savedCobro.getId());
+                mov.setEntidad(nombreCliente);
 
                 // Si es cheque, copiar datos
                 if ("CHEQUE".equals(medio.getMedio()) || "CHEQUE_ELECTRONICO".equals(medio.getMedio())) {
@@ -119,7 +147,7 @@ public class CobroService {
                     mov.setNumeroCheque(medio.getNumeroCheque());
                     mov.setLibrador(medio.getLibrador());
                     mov.setFechaEmision(medio.getFechaEmision());
-                    mov.setFechaVencimiento(medio.getFechaVenc());
+                    mov.setFechaVencimiento(medio.getFechaVencimiento());
                 }
 
                 tesoreriaService.registrarMovimiento(mov);
@@ -198,5 +226,51 @@ public class CobroService {
             // para no generar efectos en cascada inesperados
             return true;
         }).orElse(false);
+    }
+
+    public Map<String, Object> getDashboardSummary() {
+        LocalDate hoy = LocalDate.now();
+        LocalDate haceUnaSemana = hoy.minusDays(7);
+        LocalDate inicioMes = hoy.withDayOfMonth(1);
+
+        List<Remito> remitoss = remitoRepository.findAll();
+
+        // 1. Calcular Cuentas por Cobrar Total (ARS)
+        BigDecimal deudaTotal = remitoss.stream()
+                .filter(r -> r.getEstado() == Remito.EstadoRemito.VALORIZADO
+                        || r.getEstado() == Remito.EstadoRemito.COBRADO)
+                .map(r -> r.getTotal() != null ? r.getTotal() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal cobradoTotal = cobroRepository.findAll().stream()
+                .filter(c -> c.getAnulado() != null && !c.getAnulado())
+                .map(c -> c.getTotalCobrado() != null ? c.getTotalCobrado() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal cuentasPorCobrar = deudaTotal.subtract(cobradoTotal);
+
+        // 2. Métricas de Ventas por Período
+        BigDecimal ventasHoy = remitoss.stream()
+                .filter(r -> r.getFecha() != null && r.getFecha().isEqual(hoy))
+                .map(r -> r.getTotal() != null ? r.getTotal() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal ventasSemana = remitoss.stream()
+                .filter(r -> r.getFecha() != null && !r.getFecha().isBefore(haceUnaSemana))
+                .map(r -> r.getTotal() != null ? r.getTotal() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal ventasMes = remitoss.stream()
+                .filter(r -> r.getFecha() != null && !r.getFecha().isBefore(inicioMes))
+                .map(r -> r.getTotal() != null ? r.getTotal() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("cuentasPorCobrar", cuentasPorCobrar);
+        summary.put("ventasHoy", ventasHoy);
+        summary.put("ventasSemana", ventasSemana);
+        summary.put("ventasMes", ventasMes);
+
+        return summary;
     }
 }

@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
+import { apiFetch } from "../utils/api";
 import "../index.css";
 
 export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
     const [form, setForm] = useState({
-        tipo: "SALIDA", // ✅ NUEVO
         fecha: "",
-        proveedor: null,
         cliente: null,
         clienteNombre: "",
         clienteDireccion: "",
@@ -17,12 +16,22 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
     });
 
     const [productos, setProductos] = useState([]);
-    const [proveedores, setProveedores] = useState([]);
     const [clientes, setClientes] = useState([]);
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // Opciones predefinidas para el combo box de IVA
+    const [searchTerms, setSearchTerms] = useState({});
+    const [showResults, setShowResults] = useState({});
+
+    const getFilteredProducts = (term) => {
+        if (!term) return [];
+        const t = term.toLowerCase();
+        return productos.filter(p =>
+            p.nombre.toLowerCase().includes(t) ||
+            (p.sku && p.sku.toLowerCase().includes(t))
+        ).slice(0, 8);
+    };
+
     const ivaOptions = [
         { value: "", label: "-- Seleccionar condición de IVA --" },
         { value: "CONSUMIDOR_FINAL", label: "Consumidor Final" },
@@ -33,12 +42,10 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
         { value: "OTRO", label: "Otro" }
     ];
 
-    const API_PRODUCTS = "http://localhost:8080/api/productos";
-    const API_REMITOS = "http://localhost:8080/api/remitos";
-    const API_PROVEEDORES = "http://localhost:8080/api/proveedores";
-    const API_CLIENTES = "http://localhost:8080/api/clientes";
+    const API_PRODUCTS = "/api/productos";
+    const API_REMITOS = "/api/remitos";
+    const API_CLIENTES = "/api/clientes";
 
-    // Función para formatear fecha de ISO a YYYY-MM-DD
     const formatDateForInput = (isoDate) => {
         if (!isoDate) return "";
         return isoDate.split("T")[0];
@@ -47,19 +54,12 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [productsRes, providersRes, clientsRes] = await Promise.all([
-                    fetch(API_PRODUCTS),
-                    fetch(API_PROVEEDORES),
-                    fetch(API_CLIENTES)
+                const [productsRes, clientsRes] = await Promise.all([
+                    apiFetch(API_PRODUCTS),
+                    apiFetch(API_CLIENTES)
                 ]);
-
-                const productsData = productsRes.ok ? await productsRes.json() : [];
-                const providersData = providersRes.ok ? await providersRes.json() : [];
-                const clientsData = clientsRes.ok ? await clientsRes.json() : [];
-
-                setProductos(productsData);
-                setProveedores(providersData);
-                setClientes(clientsData);
+                setProductos(productsRes.ok ? await productsRes.json() : []);
+                setClientes(clientsRes.ok ? await clientsRes.json() : []);
             } catch (error) {
                 console.error("Error cargando datos:", error);
             } finally {
@@ -70,30 +70,34 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
         loadData();
 
         if (remito) {
+            const initialSearchTerms = {};
+            const initialItems = (remito.items ?? []).map((it, idx) => {
+                if (it.producto) {
+                    initialSearchTerms[idx] = it.producto.nombre + (it.producto.sku ? ` (${it.producto.sku})` : "");
+                }
+                return {
+                    producto: it.producto ?? null,
+                    cantidad: it.cantidad ?? 1,
+                    notas: it.notas ?? ""
+                };
+            });
+            setSearchTerms(initialSearchTerms);
             setForm({
-                tipo: remito.tipo || "SALIDA", // ✅ CARGAR TIPO
                 fecha: formatDateForInput(remito.fecha) || "",
-                proveedor: remito.proveedor ?? null,
                 cliente: remito.cliente ?? null,
                 clienteNombre: remito.clienteNombre ?? (remito.cliente?.nombre ?? ""),
                 clienteDireccion: remito.clienteDireccion ?? "",
                 clienteCodigoPostal: remito.clienteCodigoPostal ?? "",
                 clienteAclaracion: remito.clienteAclaracion ?? "",
                 observaciones: remito.observaciones ?? "",
-                items: (remito.items ?? []).map(it => ({
-                    producto: it.producto ?? null,
-                    cantidad: it.cantidad ?? 1,
-                    notas: it.notas ?? ""
-                }))
+                items: initialItems
             });
         } else {
-            // Al crear nuevo remito, usar fecha actual
             const hoy = new Date().toISOString().split('T')[0];
+            setSearchTerms({});
             setForm(prev => ({
                 ...prev,
-                tipo: "SALIDA", // ✅ TIPO POR DEFECTO
                 fecha: hoy,
-                proveedor: null,
                 cliente: null,
                 clienteNombre: "",
                 clienteDireccion: "",
@@ -118,25 +122,40 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
             items.splice(index, 1);
             return { ...prev, items };
         });
+        setSearchTerms(prev => {
+            const next = { ...prev };
+            delete next[index];
+            return next;
+        });
+        setShowResults(prev => {
+            const next = { ...prev };
+            delete next[index];
+            return next;
+        });
     };
 
     const updateItem = (index, key, value) => {
         setForm(prev => {
             const items = [...prev.items];
             items[index] = { ...items[index], [key]: value };
+
+            if (key === 'producto' && value) {
+                const prod = value;
+                setSearchTerms(prevTerms => ({
+                    ...prevTerms,
+                    [index]: prod.nombre + (prod.sku ? ` (${prod.sku})` : "")
+                }));
+                setShowResults(prevRes => ({ ...prevRes, [index]: false }));
+            } else if (key === 'producto' && !value) {
+                setShowResults(prevRes => ({ ...prevRes, [index]: false }));
+            }
             return { ...prev, items };
         });
-    };
-
-    const handleProveedorChange = (id) => {
-        const p = proveedores.find(x => String(x.id) === String(id)) || null;
-        setForm(prev => ({ ...prev, proveedor: p }));
     };
 
     const handleClienteChange = (id) => {
         const c = clientes.find(x => String(x.id) === String(id));
         if (!c) return;
-
         setForm(prev => ({
             ...prev,
             cliente: c,
@@ -164,9 +183,7 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
         }
 
         const payload = {
-            tipo: form.tipo, // ✅ INCLUIR TIPO EN PAYLOAD
             fecha: form.fecha || null,
-            proveedor: form.proveedor ? { id: form.proveedor.id } : null,
             cliente: form.cliente ? { id: form.cliente.id } : null,
             clienteNombre: form.clienteNombre || (form.cliente ? form.cliente.nombre : ""),
             clienteDireccion: form.clienteDireccion || "",
@@ -184,9 +201,8 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
         try {
             const method = remito && remito.id ? "PUT" : "POST";
             const url = remito && remito.id ? `${API_REMITOS}/${remito.id}` : API_REMITOS;
-            const res = await fetch(url, {
+            const res = await apiFetch(url, {
                 method,
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
 
@@ -221,13 +237,24 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1000 }}>
                 <div className="modal-header">
-                    <h2>{remito ? `Editar Remito #${remito.numero}` : "Nuevo Remito"}</h2>
+                    <h2>{remito ? `Editar Remito #${remito.numero}` : "Nuevo Remito de Venta"}</h2>
                     <button onClick={onClose} className="modal-close">×</button>
                 </div>
 
                 <form onSubmit={handleSubmit}>
                     <div className="modal-content">
                         <div className="form-grid">
+
+                            <div className="form-group full-width">
+                                <label className="form-label">Fecha del Remito</label>
+                                <input
+                                    type="date"
+                                    className="modern-input"
+                                    value={form.fecha}
+                                    onChange={e => setForm(prev => ({ ...prev, fecha: e.target.value }))}
+                                    required
+                                />
+                            </div>
 
                             <div className="form-group full-width">
                                 <label className="form-label">Cliente</label>
@@ -300,25 +327,35 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
 
                             <div className="items-container">
                                 {form.items.map((it, idx) => (
-                                    <div key={idx} className="item-row">
-                                        <div className="item-producto">
-                                            <select
+                                    <div key={idx} className="item-row" style={{ display: "grid", gridTemplateColumns: "1fr 100px 140px 40px", gap: "10px", alignItems: "center", marginBottom: "10px" }}>
+                                        <div style={{ position: "relative" }}>
+                                            <input
+                                                type="text"
                                                 className="modern-input"
-                                                value={it.producto?.id || ""}
-                                                onChange={e => {
-                                                    const pid = e.target.value;
-                                                    const prod = productos.find(p => String(p.id) === String(pid)) || { id: pid };
-                                                    updateItem(idx, "producto", prod);
+                                                placeholder="🔍 Buscar producto o SKU..."
+                                                value={searchTerms[idx] ?? ""}
+                                                autoComplete="off"
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setSearchTerms(prev => ({ ...prev, [idx]: val }));
+                                                    setShowResults(prev => ({ ...prev, [idx]: true }));
+                                                    if (!val) updateItem(idx, 'producto', null);
                                                 }}
-                                                required
-                                            >
-                                                <option value="">-- Seleccionar producto --</option>
-                                                {productos.map(p => (
-                                                    <option key={p.id} value={p.id}>
-                                                        {p.nombre} {p.sku ? `(${p.sku})` : ""}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                                onFocus={() => setShowResults(prev => ({ ...prev, [idx]: true }))}
+                                            />
+                                            {showResults[idx] && (searchTerms[idx] || "").length > 0 && (
+                                                <ul className="autocomplete-dropdown">
+                                                    {getFilteredProducts(searchTerms[idx]).map(p => (
+                                                        <li key={p.id} onClick={() => updateItem(idx, 'producto', p)}>
+                                                            <div className="prod-name">{p.nombre}</div>
+                                                            <div className="prod-sku">SKU: {p.sku || 'S/S'} | Stock: {p.stock}</div>
+                                                        </li>
+                                                    ))}
+                                                    {getFilteredProducts(searchTerms[idx]).length === 0 && (
+                                                        <li className="no-results">No se encontraron productos</li>
+                                                    )}
+                                                </ul>
+                                            )}
                                         </div>
 
                                         <div className="item-cantidad">
@@ -329,6 +366,7 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
                                                 min="1"
                                                 value={it.cantidad}
                                                 onChange={e => updateItem(idx, "cantidad", e.target.value)}
+                                                onWheel={(e) => e.target.blur()}
                                                 placeholder="Cantidad"
                                                 required
                                             />
@@ -356,7 +394,6 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
                                     </div>
                                 ))}
 
-                                {/* Botón Agregar Item debajo de la lista */}
                                 <div className="add-item-container">
                                     <button type="button" onClick={addItem} className="btn-primary full-width">
                                         <FiPlus />

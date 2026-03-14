@@ -3,8 +3,8 @@ package com.example.Sistema_Gestion.repository;
 import com.example.Sistema_Gestion.model.Producto;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface ProductoRepository extends JpaRepository<Producto, Long> {
-   // Optional<Producto> findBySku(String sku);
+import java.util.Optional;
 
-   // List<Producto> findByEliminadoFalse();
+public interface ProductoRepository extends JpaRepository<Producto, Long> {
+   Optional<Producto> findBySku(String sku);
 }

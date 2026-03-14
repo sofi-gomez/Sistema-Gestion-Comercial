@@ -21,8 +21,9 @@ public class PagoProveedor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "proveedor_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
     private Proveedor proveedor;
 
     @Column(nullable = false)
@@ -63,7 +64,7 @@ public class PagoProveedor {
     private LocalDateTime createdAt;
 
     /** Compras que cubre este pago */
-    @OneToMany(mappedBy = "pagoProveedor", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "pagoProveedor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonManagedReference("pago-compras")
     private List<PagoProveedorCompra> compras = new ArrayList<>();
 

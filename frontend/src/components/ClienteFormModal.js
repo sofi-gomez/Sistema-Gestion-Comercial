@@ -8,6 +8,7 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
     direccion: "",
     telefono: "",
     email: "",
+    codigoPostal: "",
     notas: ""
   });
 
@@ -21,6 +22,7 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
         direccion: cliente.direccion || "",
         telefono: cliente.telefono || "",
         email: cliente.email || "",
+        codigoPostal: cliente.codigoPostal || "",
         notas: cliente.notas || ""
       });
     } else {
@@ -30,6 +32,7 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
         direccion: "",
         telefono: "",
         email: "",
+        codigoPostal: "",
         notas: ""
       });
     }
@@ -38,15 +41,15 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!form.nombre.trim()) {
       newErrors.nombre = "El nombre es requerido";
     }
-    
+
     if (form.email && !/\S+@\S+\.\S+/.test(form.email)) {
       newErrors.email = "El email no es válido";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -54,7 +57,7 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
-    
+
     // Limpiar error cuando el usuario empiece a escribir
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: "" }));
@@ -63,11 +66,11 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     const payload = cliente ? { ...form, id: cliente.id } : form;
     onSave(payload);
   };
@@ -85,12 +88,12 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
             <div className="form-grid">
               <div className="form-group full-width">
                 <label className="form-label">Nombre *</label>
-                <input 
-                  name="nombre" 
-                  value={form.nombre} 
-                  onChange={handleChange} 
+                <input
+                  name="nombre"
+                  value={form.nombre}
+                  onChange={handleChange}
                   className={`modern-input ${errors.nombre ? 'error' : ''}`}
-                  required 
+                  required
                   placeholder="Nombre completo del cliente"
                 />
                 {errors.nombre && <span className="error-message">{errors.nombre}</span>}
@@ -98,32 +101,32 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
 
               <div className="form-group">
                 <label className="form-label">Documento</label>
-                <input 
-                  name="documento" 
-                  value={form.documento} 
-                  onChange={handleChange} 
-                  className="modern-input" 
+                <input
+                  name="documento"
+                  value={form.documento}
+                  onChange={handleChange}
+                  className="modern-input"
                   placeholder="DNI, CUIT, etc."
                 />
               </div>
 
               <div className="form-group">
                 <label className="form-label">Teléfono</label>
-                <input 
-                  name="telefono" 
-                  value={form.telefono} 
-                  onChange={handleChange} 
-                  className="modern-input" 
+                <input
+                  name="telefono"
+                  value={form.telefono}
+                  onChange={handleChange}
+                  className="modern-input"
                   placeholder="+54 11 1234-5678"
                 />
               </div>
 
               <div className="form-group">
                 <label className="form-label">Email</label>
-                <input 
-                  name="email" 
-                  value={form.email} 
-                  onChange={handleChange} 
+                <input
+                  name="email"
+                  value={form.email}
+                  onChange={handleChange}
                   className={`modern-input ${errors.email ? 'error' : ''}`}
                   placeholder="cliente@ejemplo.com"
                   type="email"
@@ -133,22 +136,33 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
 
               <div className="form-group full-width">
                 <label className="form-label">Dirección</label>
-                <input 
-                  name="direccion" 
-                  value={form.direccion} 
-                  onChange={handleChange} 
-                  className="modern-input" 
+                <input
+                  name="direccion"
+                  value={form.direccion}
+                  onChange={handleChange}
+                  className="modern-input"
                   placeholder="Dirección completa"
                 />
               </div>
 
               <div className="form-group full-width">
+                <label className="form-label">Código Postal</label>
+                <input
+                  name="codigoPostal"
+                  value={form.codigoPostal}
+                  onChange={handleChange}
+                  className="modern-input"
+                  placeholder="Ej: B1704, 1425, etc."
+                />
+              </div>
+
+              <div className="form-group full-width">
                 <label className="form-label">Notas</label>
-                <textarea 
-                  name="notas" 
-                  value={form.notas} 
-                  onChange={handleChange} 
-                  className="modern-textarea" 
+                <textarea
+                  name="notas"
+                  value={form.notas}
+                  onChange={handleChange}
+                  className="modern-textarea"
                   placeholder="Información adicional sobre el cliente"
                   rows="3"
                 />

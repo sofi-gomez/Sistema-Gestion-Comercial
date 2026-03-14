@@ -27,6 +27,12 @@ public class Producto {
     @Column(name = "precio_venta", precision = 10, scale = 2)
     private BigDecimal precioVenta;
 
+    @Column(name = "precio_costo_usd", precision = 10, scale = 2)
+    private BigDecimal precioCostoUSD;
+
+    @Column(name = "precio_venta_usd", precision = 10, scale = 2)
+    private BigDecimal precioVentaUSD;
+
     // ✅ CAMBIO CRÍTICO: De BigDecimal a Integer
     @Column(nullable = false)
     private Integer stock = 0;
@@ -88,6 +94,22 @@ public class Producto {
 
     public void setPrecioVenta(BigDecimal precioVenta) {
         this.precioVenta = precioVenta;
+    }
+
+    public BigDecimal getPrecioCostoUSD() {
+        return precioCostoUSD;
+    }
+
+    public void setPrecioCostoUSD(BigDecimal precioCostoUSD) {
+        this.precioCostoUSD = precioCostoUSD;
+    }
+
+    public BigDecimal getPrecioVentaUSD() {
+        return precioVentaUSD;
+    }
+
+    public void setPrecioVentaUSD(BigDecimal precioVentaUSD) {
+        this.precioVentaUSD = precioVentaUSD;
     }
 
     public Integer getStock() {

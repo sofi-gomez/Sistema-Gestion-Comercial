@@ -4,7 +4,7 @@ import com.example.Sistema_Gestion.model.Cobro;
 import com.example.Sistema_Gestion.model.CobroMedioPago;
 import com.example.Sistema_Gestion.service.CobroService;
 import com.example.Sistema_Gestion.service.RemitoService;
-import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/cobros")
+@Slf4j
 public class CobroController {
 
     private final CobroService cobroService;
@@ -38,24 +39,17 @@ public class CobroController {
      * }
      */
     @PostMapping
-    public ResponseEntity<?> registrarCobro(@RequestBody RegistrarCobroRequest req) {
-        try {
-            Cobro cobro = cobroService.registrarCobro(
-                    req.getCobro(),
-                    req.getImportesPorRemito(),
-                    req.getMediosPago());
-            return ResponseEntity.ok(cobro);
-        } catch (IllegalStateException | IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error al registrar cobro: " + e.getMessage()));
-        }
+    public Cobro registrarCobro(@RequestBody RegistrarCobroRequest req) {
+        log.info("Registrando nuevo cobro para el cliente: {}", req.getCobro().getCliente().getNombre());
+        return cobroService.registrarCobro(
+                req.getCobro(),
+                req.getImportesPorRemito(),
+                req.getMediosPago());
     }
 
     /** GET /api/cobros/cliente/{clienteId} — historial de cobros del cliente */
     @GetMapping("/cliente/{clienteId}")
-    public ResponseEntity<?> listarPorCliente(@PathVariable Long clienteId) {
+    public ResponseEntity<?> listarPorCliente(@PathVariable("clienteId") Long clienteId) {
         return ResponseEntity.ok(cobroService.listarPorCliente(clienteId));
     }
 
@@ -64,13 +58,13 @@ public class CobroController {
      * (Remitos + Cobros)
      */
     @GetMapping("/cliente/{clienteId}/movimientos")
-    public ResponseEntity<?> obtenerMovimientos(@PathVariable Long clienteId) {
+    public ResponseEntity<?> obtenerMovimientos(@PathVariable("clienteId") Long clienteId) {
         return ResponseEntity.ok(cobroService.getMovimientos(clienteId));
     }
 
     /** GET /api/cobros/{id} */
     @GetMapping("/{id}")
-    public ResponseEntity<?> obtener(@PathVariable Long id) {
+    public ResponseEntity<?> obtener(@PathVariable("id") Long id) {
         return cobroService.buscarPorId(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -78,7 +72,7 @@ public class CobroController {
 
     /** GET /api/cobros/cliente/{clienteId}/saldo — saldo pendiente del cliente */
     @GetMapping("/cliente/{clienteId}/saldo")
-    public ResponseEntity<?> saldoCliente(@PathVariable Long clienteId) {
+    public ResponseEntity<?> saldoCliente(@PathVariable("clienteId") Long clienteId) {
         BigDecimal saldo = cobroService.calcularSaldoCliente(clienteId);
         return ResponseEntity.ok(Map.of("clienteId", clienteId, "saldo", saldo));
     }
@@ -92,10 +86,15 @@ public class CobroController {
 
     /** DELETE /api/cobros/{id}/anular */
     @DeleteMapping("/{id}/anular")
-    public ResponseEntity<?> anularCobro(@PathVariable Long id) {
+    public ResponseEntity<?> anularCobro(@PathVariable("id") Long id) {
         boolean ok = cobroService.anularCobro(id);
         return ok ? ResponseEntity.ok(Map.of("mensaje", "Cobro anulado"))
                 : ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/dashboard-summary")
+    public ResponseEntity<?> getDashboardSummary() {
+        return ResponseEntity.ok(cobroService.getDashboardSummary());
     }
 
     // ---- Inner class para el request body ----

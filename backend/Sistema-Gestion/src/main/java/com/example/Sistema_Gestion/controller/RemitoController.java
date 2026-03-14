@@ -2,19 +2,24 @@ package com.example.Sistema_Gestion.controller;
 
 import com.example.Sistema_Gestion.model.Remito;
 import com.example.Sistema_Gestion.service.RemitoService;
-import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/remitos")
+@Slf4j
 public class RemitoController {
 
     private final RemitoService remitoService;
@@ -24,134 +29,80 @@ public class RemitoController {
     }
 
     @GetMapping
-    public ResponseEntity<?> listarTodos() {
-        return ResponseEntity.ok(remitoService.listarTodos());
+    public List<Remito> listarTodos() {
+        return remitoService.listarTodos();
     }
 
-    /** GET /api/remitos?estado=PENDIENTE — filtrar por estado */
     @GetMapping(params = "estado")
-    public ResponseEntity<?> listarPorEstado(@RequestParam("estado") String estado) {
+    public List<Remito> listarPorEstado(@RequestParam("estado") String estado) {
         try {
             Remito.EstadoRemito estadoEnum = Remito.EstadoRemito.valueOf(estado.toUpperCase());
-            return ResponseEntity.ok(remitoService.listarPorEstado(estadoEnum));
+            return remitoService.listarPorEstado(estadoEnum);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Estado inválido: " + estado));
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado inválido: " + estado);
         }
-    }
-
-    /** GET /api/remitos/cliente/{clienteId} — remitos de un cliente */
-    @GetMapping("/cliente/{clienteId}")
-    public ResponseEntity<?> listarPorCliente(@PathVariable("clienteId") Long clienteId) {
-        return ResponseEntity.ok(remitoService.listarPorCliente(clienteId));
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<?> obtener(@PathVariable("id") Long id) {
-        return remitoService.buscarPorId(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<?> crearRemito(@RequestBody Remito remito) {
-        try {
-            Remito creado = remitoService.generarRemito(remito);
-            return ResponseEntity.ok(creado);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error al crear remito: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * POST /api/remitos/{id}/valorizar
-     *
-     * Body:
-     * {
-     * "cotizacionDolar": 1050.00,
-     * "precios": {
-     * "itemId": precioUnitario,
-     * "42": 7500.00,
-     * "43": 12000.00
-     * }
-     * }
-     */
-    @PostMapping("/{id}/valorizar")
-    public ResponseEntity<?> valorizar(@PathVariable("id") Long id, @RequestBody ValorizarRequest req) {
-        try {
-            Remito valorizado = remitoService.valorizar(id, req.getPrecios(), req.getCotizacionDolar());
-            return ResponseEntity.ok(valorizado);
-        } catch (IllegalStateException | IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error al valorizar: " + e.getMessage()));
-        }
-    }
-
-    @PostMapping("/{id}/cobrar")
-    public ResponseEntity<?> cobrar(@PathVariable("id") Long id) {
-        try {
-            Remito cobrado = remitoService.marcarComoCobrado(id);
-            return ResponseEntity.ok(cobrado);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error al registrar cobro: " + e.getMessage()));
-        }
+    public Remito crearRemito(@RequestBody Remito remito) {
+        log.info("Generando nuevo remito para el cliente: {}", remito.getClienteNombre());
+        return remitoService.generarRemito(remito);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> actualizarRemito(@PathVariable("id") Long id, @RequestBody Remito remito) {
-        if (!remitoService.buscarPorId(id).isPresent()) {
-            return ResponseEntity.notFound().build();
-        }
+    public Remito actualizarRemito(@PathVariable("id") Long id, @RequestBody Remito remito) {
+        log.info("Actualizando remito ID: {}", id);
         remito.setId(id);
-        try {
-            Remito actualizado = remitoService.actualizarRemito(remito);
-            return ResponseEntity.ok(actualizado);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error al actualizar remito: " + e.getMessage()));
-        }
+        return remitoService.actualizarRemito(remito);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> eliminarRemito(@PathVariable("id") Long id) {
-        try {
-            remitoService.eliminarRemito(id);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error al eliminar remito: " + e.getMessage()));
-        }
+    public ResponseEntity<Void> eliminarRemito(@PathVariable("id") Long id) {
+        log.info("Eliminando remito ID: {}", id);
+        remitoService.eliminarRemito(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}/pdf")
-    public void descargarPdf(@PathVariable("id") Long id, HttpServletResponse response) {
-        Remito remito = remitoService.buscarPorId(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        response.setContentType("application/pdf");
-        response.setHeader("Content-Disposition", "attachment; filename=remito_" + remito.getNumero() + ".pdf");
-        try {
+    public ResponseEntity<byte[]> descargarPdf(@PathVariable("id") Long id) {
+        Remito remito = remitoService.buscarPorIdConItems(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Remito no encontrado"));
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             byte[] logo = null;
             try {
                 logo = Files.readAllBytes(Paths.get("src/main/resources/static/logo.png"));
             } catch (Exception ex) {
-                logo = null;
+                log.warn("No se pudo cargar el logo para el PDF del remito {}", id);
             }
-            remitoService.generarPdfRemito(remito, response.getOutputStream(), logo);
+
+            remitoService.generarPdfRemito(remito, baos, logo);
+            byte[] pdfBytes = baos.toByteArray();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "remito_" + remito.getNumero() + ".pdf");
+            headers.setContentLength(pdfBytes.length);
+
+            return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
         } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error generando PDF", e);
+            log.error("Error al generar PDF para remito ID: {}", id, e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error generando PDF");
         }
     }
 
-    // ---- Inner DTO ----
+    @PostMapping("/{id}/valorizar")
+    public Remito valorizar(@PathVariable("id") Long id, @RequestBody ValorizarRequest req) {
+        log.info("Valorizando remito ID: {}", id);
+        return remitoService.valorizar(id, req.getPrecios(), req.getCotizacionDolar());
+    }
+
+    @PostMapping("/{id}/cobrar")
+    public Remito cobrar(@PathVariable("id") Long id) {
+        log.info("Marcando remito ID: {} como cobrado", id);
+        return remitoService.marcarComoCobrado(id);
+    }
+
     public static class ValorizarRequest {
         private BigDecimal cotizacionDolar;
         private Map<Long, BigDecimal> precios;

@@ -27,7 +27,7 @@ public class CobroMedioPago {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "cobro_id", nullable = false)
     @JsonBackReference("cobro-medios")
     private Cobro cobro;
@@ -55,8 +55,8 @@ public class CobroMedioPago {
     @Column(name = "fecha_cobro")
     private LocalDate fechaCobro;
 
-    @Column(name = "fecha_venc")
-    private LocalDate fechaVenc;
+    @Column(name = "fecha_vencimiento")
+    private LocalDate fechaVencimiento;
 
     @Column(name = "tipo_cheque", length = 20)
     private String tipoCheque; // FISICO, ELECTRONICO
@@ -135,12 +135,12 @@ public class CobroMedioPago {
         this.fechaCobro = fechaCobro;
     }
 
-    public LocalDate getFechaVenc() {
-        return fechaVenc;
+    public LocalDate getFechaVencimiento() {
+        return fechaVencimiento;
     }
 
-    public void setFechaVenc(LocalDate fechaVenc) {
-        this.fechaVenc = fechaVenc;
+    public void setFechaVencimiento(LocalDate fechaVencimiento) {
+        this.fechaVencimiento = fechaVencimiento;
     }
 
     public String getTipoCheque() {

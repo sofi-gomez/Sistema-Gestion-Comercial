@@ -25,13 +25,19 @@ public class PagoProveedorService {
     private final PagoProveedorRepository pagoProveedorRepository;
     private final PagoProveedorCompraRepository pagoProveedorCompraRepository;
     private final CompraRepository compraRepository;
+    private final TesoreriaService tesoreriaService;
+    private final ProveedorRepository proveedorRepository;
 
     public PagoProveedorService(PagoProveedorRepository pagoProveedorRepository,
             PagoProveedorCompraRepository pagoProveedorCompraRepository,
-            CompraRepository compraRepository) {
+            CompraRepository compraRepository,
+            TesoreriaService tesoreriaService,
+            ProveedorRepository proveedorRepository) {
         this.pagoProveedorRepository = pagoProveedorRepository;
         this.pagoProveedorCompraRepository = pagoProveedorCompraRepository;
         this.compraRepository = compraRepository;
+        this.tesoreriaService = tesoreriaService;
+        this.proveedorRepository = proveedorRepository;
     }
 
     /**
@@ -48,33 +54,61 @@ public class PagoProveedorService {
             pago.setFecha(LocalDate.now());
         }
 
-        // Calcular total del pago como suma de los importes distribuidos
-        BigDecimal totalDistribuido = importesPorCompra.values().stream()
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        pago.setImporte(totalDistribuido);
+        // Calcular total del pago como suma de los importes distribuidos (solo si hay
+        // distribuciones)
+        if (importesPorCompra != null && !importesPorCompra.isEmpty()) {
+            BigDecimal totalDistribuido = importesPorCompra.values().stream()
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            pago.setImporte(totalDistribuido);
+        }
+
+        // Capturar nombre antes del save para evitar proxy Hibernate
+        String nombreProveedor = "Proveedor";
+        if (pago.getProveedor() != null) {
+            if (pago.getProveedor().getNombre() != null && !pago.getProveedor().getNombre().isEmpty()) {
+                nombreProveedor = pago.getProveedor().getNombre();
+            } else if (pago.getProveedor().getId() != null) {
+                nombreProveedor = proveedorRepository.findById(pago.getProveedor().getId())
+                        .map(Proveedor::getNombre)
+                        .orElse("Proveedor");
+            }
+        }
 
         // Persistir pago
         PagoProveedor savedPago = pagoProveedorRepository.save(pago);
 
+        // ✅ Crear Movimiento de Tesorería automáticamente
+        MovimientoTesoreria mov = new MovimientoTesoreria();
+        mov.setTipo("EGRESO");
+        mov.setMedioPago(savedPago.getMedio());
+        mov.setImporte(savedPago.getImporte());
+        mov.setFecha(savedPago.getFecha().atStartOfDay());
+        mov.setDescripcion("Pago a Proveedor: " + nombreProveedor);
+        mov.setReferencia("Pago #" + savedPago.getId());
+        mov.setEntidad(nombreProveedor);
+        tesoreriaService.registrarMovimiento(mov);
+
         // Distribuir entre compras
-        for (Map.Entry<Long, BigDecimal> entry : importesPorCompra.entrySet()) {
-            Long compraId = entry.getKey();
-            BigDecimal importe = entry.getValue();
+        if (importesPorCompra != null) {
+            for (Map.Entry<Long, BigDecimal> entry : importesPorCompra.entrySet()) {
+                Long compraId = entry.getKey();
+                BigDecimal importe = entry.getValue();
 
-            Compra compra = compraRepository.findById(compraId)
-                    .orElseThrow(() -> new RuntimeException("Compra no encontrada: " + compraId));
+                Compra compra = compraRepository.findById(compraId)
+                        .orElseThrow(() -> new RuntimeException("Compra no encontrada: " + compraId));
 
-            // Registrar el importe aplicado a esta compra
-            PagoProveedorCompra pc = new PagoProveedorCompra();
-            pc.setPagoProveedor(savedPago);
-            pc.setCompra(compra);
-            pc.setImporte(importe);
-            savedPago.getCompras().add(pc);
+                // Registrar el importe aplicado a esta compra
+                PagoProveedorCompra pc = new PagoProveedorCompra();
+                pc.setPagoProveedor(savedPago);
+                pc.setCompra(compra);
+                pc.setImporte(importe);
+                savedPago.getCompras().add(pc);
 
-            // Recalcular deuda de esta compra y actualizar su estado
-            BigDecimal totalPagadoAntes = pagoProveedorCompraRepository.totalPagadoPorCompra(compraId);
-            BigDecimal totalPagadoAhora = totalPagadoAntes.add(importe);
-            actualizarEstadoCompra(compra, totalPagadoAhora);
+                // Recalcular deuda de esta compra y actualizar su estado
+                BigDecimal totalPagadoAntes = pagoProveedorCompraRepository.totalPagadoPorCompra(compraId);
+                BigDecimal totalPagadoAhora = totalPagadoAntes.add(importe);
+                actualizarEstadoCompra(compra, totalPagadoAhora);
+            }
         }
 
         return pagoProveedorRepository.save(savedPago);
@@ -124,6 +158,8 @@ public class PagoProveedorService {
         return pagoProveedorRepository.findById(id).map(pago -> {
             pago.setAnulado(true);
             pagoProveedorRepository.save(pago);
+            // Anular movimiento correlativo en Tesorería
+            tesoreriaService.anularPorReferencia("Pago #" + pago.getId());
             return true;
         }).orElse(false);
     }

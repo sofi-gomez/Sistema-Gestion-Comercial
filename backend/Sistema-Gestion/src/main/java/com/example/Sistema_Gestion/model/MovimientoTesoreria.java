@@ -22,7 +22,6 @@ public class MovimientoTesoreria {
         ELECTRONICO
     }
 
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -56,9 +55,8 @@ public class MovimientoTesoreria {
     @Column(name = "cobrado", nullable = false)
     private Boolean cobrado = false;
 
-    @Column(name = "venta_id")
-    private Long ventaId;
-
+    @Column(length = 200)
+    private String entidad; // Cliente, Proveedor o Persona externa
 
     // ================= DATOS DE CHEQUE =================
 
@@ -81,7 +79,6 @@ public class MovimientoTesoreria {
     @Column(name = "fecha_vencimiento")
     private LocalDate fechaVencimiento;
 
-
     @PrePersist
     protected void onCreate() {
         if (fecha == null) {
@@ -94,12 +91,33 @@ public class MovimientoTesoreria {
             updatedAt = LocalDateTime.now();
         }
 
-        // Marcar como cobrado automáticamente si es EFECTIVO
-        if ("EFECTIVO".equals(this.medioPago)) {
-            this.cobrado = true;
+        // Automatización de estado 'Cobrado'
+        if (this.medioPago != null) {
+            // 1. Medios electrónicos o efectivo: Cobro inmediato
+            if (isMedioPagoInmediato()) {
+                this.cobrado = true;
+            }
+            // 2. Cheques: Cobro si la fecha de cobro ya llegó o pasó
+            else if (isCheque() && fechaCobro != null) {
+                if (!fechaCobro.isAfter(LocalDate.now())) {
+                    this.cobrado = true;
+                }
+            }
         }
 
         calcularVencimientoCheque();
+    }
+
+    private boolean isMedioPagoInmediato() {
+        return "EFECTIVO".equals(this.medioPago) ||
+                "TRANSFERENCIA".equals(this.medioPago) ||
+                "TARJETA_DEBITO".equals(this.medioPago) ||
+                "TARJETA_CREDITO".equals(this.medioPago) ||
+                "MERCADO_PAGO".equals(this.medioPago);
+    }
+
+    private boolean isCheque() {
+        return "CHEQUE".equals(this.medioPago) || "CHEQUE_ELECTRONICO".equals(this.medioPago);
     }
 
     @PreUpdate
@@ -122,7 +140,6 @@ public class MovimientoTesoreria {
             fechaVencimiento = fechaCobro.plusDays(30);
         }
     }
-
 
     public void setTipoEnum(TipoMovimiento tipo) {
         this.tipo = tipo.name();
@@ -152,7 +169,6 @@ public class MovimientoTesoreria {
         this.tipoCheque = tipo.name();
     }
 
-
     @Transient
     public boolean isChequeVencido() {
         return getMedioPagoEnum() == MedioPago.CHEQUE
@@ -168,64 +184,158 @@ public class MovimientoTesoreria {
                 && fechaVencimiento.isBefore(LocalDate.now().plusDays(dias));
     }
 
-
     // ================= GETTERS Y SETTERS =================
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public String getTipo() { return tipo; }
-    public void setTipo(String tipo) { this.tipo = tipo; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getMedioPago() { return medioPago; }
-    public void setMedioPago(String medioPago) { this.medioPago = medioPago; }
+    public String getTipo() {
+        return tipo;
+    }
 
-    public BigDecimal getImporte() { return importe; }
-    public void setImporte(BigDecimal importe) { this.importe = importe; }
+    public void setTipo(String tipo) {
+        this.tipo = tipo;
+    }
 
-    public String getReferencia() { return referencia; }
-    public void setReferencia(String referencia) { this.referencia = referencia; }
+    public String getMedioPago() {
+        return medioPago;
+    }
 
-    public String getDescripcion() { return descripcion; }
-    public void setDescripcion(String descripcion) { this.descripcion = descripcion; }
+    public void setMedioPago(String medioPago) {
+        this.medioPago = medioPago;
+    }
 
-    public LocalDateTime getFecha() { return fecha; }
-    public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
+    public BigDecimal getImporte() {
+        return importe;
+    }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public void setImporte(BigDecimal importe) {
+        this.importe = importe;
+    }
 
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getReferencia() {
+        return referencia;
+    }
 
-    public Boolean getAnulado() { return anulado; }
-    public void setAnulado(Boolean anulado) { this.anulado = anulado; }
+    public void setReferencia(String referencia) {
+        this.referencia = referencia;
+    }
 
-    public Boolean getCobrado() { return cobrado; }
-    public void setCobrado(Boolean cobrado) { this.cobrado = cobrado; }
+    public String getDescripcion() {
+        return descripcion;
+    }
 
-    public Long getVentaId() { return ventaId; }
-    public void setVentaId(Long ventaId) { this.ventaId = ventaId; }
+    public void setDescripcion(String descripcion) {
+        this.descripcion = descripcion;
+    }
+
+    public LocalDateTime getFecha() {
+        return fecha;
+    }
+
+    public void setFecha(LocalDateTime fecha) {
+        this.fecha = fecha;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public Boolean getAnulado() {
+        return anulado;
+    }
+
+    public void setAnulado(Boolean anulado) {
+        this.anulado = anulado;
+    }
+
+    public Boolean getCobrado() {
+        return cobrado;
+    }
+
+    public void setCobrado(Boolean cobrado) {
+        this.cobrado = cobrado;
+    }
+
+    public String getEntidad() {
+        return entidad;
+    }
+
+    public void setEntidad(String entidad) {
+        this.entidad = entidad;
+    }
 
     // Getters y Setters de campos de cheque
-    public String getTipoCheque() { return tipoCheque; }
-    public void setTipoCheque(String tipoCheque) { this.tipoCheque = tipoCheque; }
+    public String getTipoCheque() {
+        return tipoCheque;
+    }
 
-    public String getBanco() { return banco; }
-    public void setBanco(String banco) { this.banco = banco; }
+    public void setTipoCheque(String tipoCheque) {
+        this.tipoCheque = tipoCheque;
+    }
 
-    public String getNumeroCheque() { return numeroCheque; }
-    public void setNumeroCheque(String numeroCheque) { this.numeroCheque = numeroCheque; }
+    public String getBanco() {
+        return banco;
+    }
 
-    public String getLibrador() { return librador; }
-    public void setLibrador(String librador) { this.librador = librador; }
+    public void setBanco(String banco) {
+        this.banco = banco;
+    }
 
-    public LocalDate getFechaEmision() { return fechaEmision; }
-    public void setFechaEmision(LocalDate fechaEmision) { this.fechaEmision = fechaEmision; }
+    public String getNumeroCheque() {
+        return numeroCheque;
+    }
 
-    public LocalDate getFechaCobro() { return fechaCobro; }
-    public void setFechaCobro(LocalDate fechaCobro) { this.fechaCobro = fechaCobro; }
+    public void setNumeroCheque(String numeroCheque) {
+        this.numeroCheque = numeroCheque;
+    }
 
-    public LocalDate getFechaVencimiento() { return fechaVencimiento; }
-    public void setFechaVencimiento(LocalDate fechaVencimiento) { this.fechaVencimiento = fechaVencimiento; }
+    public String getLibrador() {
+        return librador;
+    }
+
+    public void setLibrador(String librador) {
+        this.librador = librador;
+    }
+
+    public LocalDate getFechaEmision() {
+        return fechaEmision;
+    }
+
+    public void setFechaEmision(LocalDate fechaEmision) {
+        this.fechaEmision = fechaEmision;
+    }
+
+    public LocalDate getFechaCobro() {
+        return fechaCobro;
+    }
+
+    public void setFechaCobro(LocalDate fechaCobro) {
+        this.fechaCobro = fechaCobro;
+    }
+
+    public LocalDate getFechaVencimiento() {
+        return fechaVencimiento;
+    }
+
+    public void setFechaVencimiento(LocalDate fechaVencimiento) {
+        this.fechaVencimiento = fechaVencimiento;
+    }
 }

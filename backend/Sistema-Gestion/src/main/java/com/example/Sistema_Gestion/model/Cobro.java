@@ -21,7 +21,7 @@ public class Cobro {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "cliente_id", nullable = false)
     private Cliente cliente;
 
@@ -42,12 +42,12 @@ public class Cobro {
     private LocalDateTime createdAt;
 
     /** Remitos que cubre este cobro (con el importe aplicado a cada uno) */
-    @OneToMany(mappedBy = "cobro", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "cobro", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonManagedReference("cobro-remitos")
     private List<CobroRemito> remitos = new ArrayList<>();
 
     /** Medios de pago usados en este cobro (puede ser mixto) */
-    @OneToMany(mappedBy = "cobro", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "cobro", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonManagedReference("cobro-medios")
     private List<CobroMedioPago> mediosPago = new ArrayList<>();
 

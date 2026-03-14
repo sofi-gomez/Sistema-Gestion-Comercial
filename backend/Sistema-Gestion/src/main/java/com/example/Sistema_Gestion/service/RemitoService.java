@@ -52,6 +52,20 @@ public class RemitoService {
         return remitoRepository.findById(id);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<Remito> buscarPorIdConItems(Long id) {
+        Optional<Remito> opt = remitoRepository.findById(id);
+        opt.ifPresent(r -> {
+            r.getItems().size(); // Inicializa la lista lazy
+            for (RemitoItem item : r.getItems()) {
+                if (item.getProducto() != null) {
+                    item.getProducto().getNombre(); // Forzar carga del producto LAZY
+                }
+            }
+        });
+        return opt;
+    }
+
     /**
      * Crea un remito PENDIENTE y descuenta el stock inmediatamente.
      * REGLA: el stock se descuenta al entregar la mercadería, no al cobrar.
@@ -70,7 +84,7 @@ public class RemitoService {
 
         Remito saved = remitoRepository.save(remito);
 
-        // Descontar stock al momento de crear el remito
+        // Gestión de stock al momento de crear el remito
         if (saved.getItems() != null) {
             for (RemitoItem item : saved.getItems()) {
                 if (item.getProducto() != null && item.getCantidad() != null) {
@@ -150,10 +164,10 @@ public class RemitoService {
         if (remito.getItems() != null) {
             for (RemitoItem item : remito.getItems()) {
                 if (item.getProducto() != null && item.getCantidad() != null) {
-                    // Restar la cantidad negativa = sumar al stock
-                    productoService.descontarStock(
+                    // Era una salida (restó stock), al eliminar sumamos
+                    productoService.aumentarStock(
                             item.getProducto().getId(),
-                            item.getCantidad().negate().intValue());
+                            item.getCantidad().intValue());
                 }
             }
         }
@@ -285,10 +299,10 @@ public class RemitoService {
             float tableTop = infoStartY - 20;
 
             // Header de la tabla
-            cs.setNonStrokingColor(240 / 255f, 240 / 255f, 240 / 255f);
+            cs.setNonStrokingColor(new java.awt.Color(240, 240, 240));
             cs.addRect(x, tableTop - 25, w - 2 * margin, 25);
             cs.fill();
-            cs.setNonStrokingColor(0, 0, 0);
+            cs.setNonStrokingColor(java.awt.Color.BLACK);
 
             // Bordes del header
             cs.setLineWidth(0.5f);
@@ -357,7 +371,7 @@ public class RemitoService {
             float bottomY = Math.max(rowY - 30, 180);
 
             // Observaciones (si existen)
-            String observaciones = safeString(remito.getObservaciones());
+            String observaciones = remito.getObservaciones() == null ? "" : remito.getObservaciones();
             if (!observaciones.isEmpty()) {
                 cs.beginText();
                 cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
@@ -453,27 +467,36 @@ public class RemitoService {
 
     // Método helper para dividir texto en líneas
     private String[] splitText(String text, int maxLength) {
-        if (text.length() <= maxLength) {
-            return new String[] { text };
-        }
+        if (text == null)
+            return new String[0];
+        String[] hardLines = text.split("\n");
         java.util.List<String> lines = new java.util.ArrayList<>();
-        int start = 0;
-        while (start < text.length()) {
-            int end = Math.min(start + maxLength, text.length());
-            if (end < text.length()) {
-                int lastSpace = text.lastIndexOf(' ', end);
-                if (lastSpace > start) {
-                    end = lastSpace;
+        for (String hardLine : hardLines) {
+            String sanitized = hardLine.replace('\t', ' ').replace('\r', ' ');
+            if (sanitized.length() <= maxLength) {
+                lines.add(sanitized);
+            } else {
+                int start = 0;
+                while (start < sanitized.length()) {
+                    int end = Math.min(start + maxLength, sanitized.length());
+                    if (end < sanitized.length()) {
+                        int lastSpace = sanitized.lastIndexOf(' ', end);
+                        if (lastSpace > start) {
+                            end = lastSpace;
+                        }
+                    }
+                    lines.add(sanitized.substring(start, end).trim());
+                    start = end;
                 }
             }
-            lines.add(text.substring(start, end).trim());
-            start = end;
         }
         return lines.toArray(new String[0]);
     }
 
     // Helper para strings seguros
     private String safeString(String s) {
-        return s == null ? "" : s;
+        if (s == null)
+            return "";
+        return s.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
     }
 }
