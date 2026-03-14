@@ -1,21 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FiDollarSign, FiTrendingDown, FiCheckCircle, FiFileText, FiPlus } from "react-icons/fi";
 import CobroFormModal from "./CobroFormModal";
+import { formatDateLocal } from "../utils/dateUtils";
+import { apiFetch } from "../utils/api";
 
-const API_COBROS = "http://localhost:8080/api/cobros";
+const API_COBROS = "/api/cobros";
 
 export default function ClienteCtaCteSection({ clienteId }) {
     const [saldo, setSaldo] = useState(0);
     const [movimientos, setMovimientos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalCobroOpen, setModalCobroOpen] = useState(false);
+    const [sortOrder, setSortOrder] = useState("desc"); // "asc" o "desc"
 
-    const fetchCtaCte = async () => {
+    const fetchCtaCte = useCallback(async () => {
         setLoading(true);
         try {
             const [resSaldo, resMovs] = await Promise.all([
-                fetch(`${API_COBROS}/cliente/${clienteId}/saldo`),
-                fetch(`${API_COBROS}/cliente/${clienteId}/movimientos`)
+                apiFetch(`${API_COBROS}/cliente/${clienteId}/saldo`),
+                apiFetch(`${API_COBROS}/cliente/${clienteId}/movimientos`)
             ]);
 
             if (resSaldo.ok) {
@@ -25,8 +28,6 @@ export default function ClienteCtaCteSection({ clienteId }) {
             if (resMovs.ok) {
                 const data = await resMovs.json();
                 // Calcular saldo acumulado para cada línea
-                // El backend devuelve los movimientos ordenados por fecha DESC
-                // Para el saldo acumulado, invertimos, calculamos y volvemos a invertir
                 let RunningSaldo = 0;
                 const movsWithSaldo = [...data].reverse().map(m => {
                     if (m.tipo === "DEBE") RunningSaldo += m.importe;
@@ -41,11 +42,11 @@ export default function ClienteCtaCteSection({ clienteId }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [clienteId]);
 
     useEffect(() => {
         fetchCtaCte();
-    }, [clienteId]);
+    }, [clienteId, fetchCtaCte]);
 
     return (
         <div className="ctacte-section">
@@ -68,7 +69,23 @@ export default function ClienteCtaCteSection({ clienteId }) {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                 <h3>Estado de Cuenta / Movimientos</h3>
-                <div style={{ display: "flex", gap: "10px" }}>
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <div style={{ display: "flex", background: "#f1f5f9", borderRadius: "8px", padding: "4px" }}>
+                        <button
+                            className={`tab-btn-modern ${sortOrder === "desc" ? "active" : ""}`}
+                            style={{ padding: "6px 12px", fontSize: "0.8rem", height: "auto", borderRadius: "6px", borderBottom: "none" }}
+                            onClick={() => setSortOrder("desc")}
+                        >
+                            Más nuevos arriba
+                        </button>
+                        <button
+                            className={`tab-btn-modern ${sortOrder === "asc" ? "active" : ""}`}
+                            style={{ padding: "6px 12px", fontSize: "0.8rem", height: "auto", borderRadius: "6px", borderBottom: "none" }}
+                            onClick={() => setSortOrder("asc")}
+                        >
+                            Más viejos arriba
+                        </button>
+                    </div>
                     <button className="btn-secondary" onClick={fetchCtaCte} style={{ padding: "6px 12px", fontSize: "0.85rem" }}>Actualizar</button>
                     <button
                         className="btn-primary"
@@ -98,9 +115,9 @@ export default function ClienteCtaCteSection({ clienteId }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {movimientos.map((m, idx) => (
+                            {(sortOrder === "asc" ? [...movimientos].reverse() : movimientos).map((m, idx) => (
                                 <tr key={`${m.tipo}-${m.idReferencia}-${idx}`}>
-                                    <td>{new Date(m.fecha).toLocaleDateString()}</td>
+                                    <td>{formatDateLocal(m.fecha)}</td>
                                     <td>
                                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                             {m.tipo === "DEBE" ? <FiFileText color="var(--primary)" /> : <FiCheckCircle color="#10b981" />}

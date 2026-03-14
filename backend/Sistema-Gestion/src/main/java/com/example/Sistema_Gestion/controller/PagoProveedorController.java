@@ -2,7 +2,7 @@ package com.example.Sistema_Gestion.controller;
 
 import com.example.Sistema_Gestion.model.PagoProveedor;
 import com.example.Sistema_Gestion.service.PagoProveedorService;
-import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,6 +11,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/pagos-proveedor")
+@Slf4j
 public class PagoProveedorController {
 
     private final PagoProveedorService pagoProveedorService;
@@ -30,29 +31,23 @@ public class PagoProveedorController {
      * }
      */
     @PostMapping
-    public ResponseEntity<?> registrarPago(@RequestBody RegistrarPagoRequest req) {
-        try {
-            PagoProveedor pago = pagoProveedorService.registrarPago(
-                    req.getPago(),
-                    req.getImportesPorCompra());
-            return ResponseEntity.ok(pago);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error al registrar pago: " + e.getMessage()));
-        }
+    public PagoProveedor registrarPago(@RequestBody RegistrarPagoRequest req) {
+        log.info("Registrando nuevo pago para el proveedor: {}",
+                req.getPago().getProveedor() != null ? req.getPago().getProveedor().getNombre() : "N/A");
+        return pagoProveedorService.registrarPago(
+                req.getPago(),
+                req.getImportesPorCompra());
     }
 
     /** GET /api/pagos-proveedor/proveedor/{proveedorId} */
     @GetMapping("/proveedor/{proveedorId}")
-    public ResponseEntity<?> listarPorProveedor(@PathVariable Long proveedorId) {
+    public ResponseEntity<?> listarPorProveedor(@PathVariable("proveedorId") Long proveedorId) {
         return ResponseEntity.ok(pagoProveedorService.listarPorProveedor(proveedorId));
     }
 
     /** GET /api/pagos-proveedor/{id} */
     @GetMapping("/{id}")
-    public ResponseEntity<?> obtener(@PathVariable Long id) {
+    public ResponseEntity<?> obtener(@PathVariable("id") Long id) {
         return pagoProveedorService.buscarPorId(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -60,14 +55,14 @@ public class PagoProveedorController {
 
     /** GET /api/pagos-proveedor/proveedor/{proveedorId}/deuda */
     @GetMapping("/proveedor/{proveedorId}/deuda")
-    public ResponseEntity<?> deudaProveedor(@PathVariable Long proveedorId) {
+    public ResponseEntity<?> deudaProveedor(@PathVariable("proveedorId") Long proveedorId) {
         BigDecimal deuda = pagoProveedorService.calcularDeudaProveedor(proveedorId);
         return ResponseEntity.ok(Map.of("proveedorId", proveedorId, "deuda", deuda));
     }
 
     /** DELETE /api/pagos-proveedor/{id}/anular */
     @DeleteMapping("/{id}/anular")
-    public ResponseEntity<?> anularPago(@PathVariable Long id) {
+    public ResponseEntity<?> anularPago(@PathVariable("id") Long id) {
         boolean ok = pagoProveedorService.anularPago(id);
         return ok ? ResponseEntity.ok(Map.of("mensaje", "Pago anulado"))
                 : ResponseEntity.notFound().build();

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { FiDollarSign, FiCreditCard, FiSmartphone, FiHash, FiCalendar, FiUser } from "react-icons/fi";
+import { FiDollarSign, FiCreditCard, FiHash, FiUser } from "react-icons/fi";
 import CamposCheque from "./CamposCheque";
+import { apiFetch } from "../utils/api";
 
-const API_CLIENTES = "http://localhost:8080/api/clientes";
-const API_COBROS = "http://localhost:8080/api/cobros";
+const API_CLIENTES = "/api/clientes";
+const API_COBROS = "/api/cobros";
 
-export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected = null, montoSugerido = "" }) {
+export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected = null, montoSugerido = "", remitoId = null }) {
     const [clientes, setClientes] = useState([]);
     const [clienteId, setClienteId] = useState(clienteIdPreselected || "");
     const [monto, setMonto] = useState(montoSugerido || "");
@@ -22,7 +23,7 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
 
     useEffect(() => {
         if (!clienteIdPreselected) {
-            fetch(API_CLIENTES)
+            apiFetch(API_CLIENTES)
                 .then(res => res.json())
                 .then(data => setClientes(data || []))
                 .catch(err => console.error("Error cargando clientes:", err));
@@ -36,6 +37,14 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
             return;
         }
 
+        const medioPagoCheque = medioPago.includes("CHEQUE");
+        if (medioPagoCheque) {
+            if (!banco || !numeroCheque || !fechaEmision || !fechaVencimiento) {
+                alert("Por favor complete todos los campos obligatorios del cheque (Banco, Número, Emisión y Vencimiento).");
+                return;
+            }
+        }
+
         setLoading(true);
         try {
             const payload = {
@@ -44,7 +53,7 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                     totalCobrado: parseFloat(monto),
                     observaciones: observaciones.trim() || `Cobro en ${medioPago.toLowerCase()}`
                 },
-                importesPorRemito: {}, // En el futuro se podría aplicar a remitos específicos
+                importesPorRemito: remitoId ? { [remitoId]: parseFloat(monto) } : {},
                 mediosPago: [
                     {
                         medio: medioPago,
@@ -59,9 +68,8 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                 ]
             };
 
-            const res = await fetch(API_COBROS, {
+            const res = await apiFetch(API_COBROS, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
 
@@ -125,6 +133,7 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                                         className="modern-input"
                                         value={monto}
                                         onChange={e => setMonto(e.target.value)}
+                                        onWheel={(e) => e.target.blur()}
                                         placeholder="0.00"
                                         required
                                     />
@@ -150,28 +159,19 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                             {esCheque && (
                                 <div className="cheque-fields-container" style={{ background: "#f8fafc", padding: "1rem", borderRadius: "12px", border: "1px solid var(--border)" }}>
                                     <h4 style={{ marginBottom: "1rem", fontSize: "0.9rem", color: "var(--primary)" }}>Datos del Cheque</h4>
-                                    <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
-                                        <div className="form-group">
-                                            <label className="form-label">Banco</label>
-                                            <input className="modern-input" value={banco} onChange={e => setBanco(e.target.value)} />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Nº Cheque</label>
-                                            <input className="modern-input" value={numeroCheque} onChange={e => setNumeroCheque(e.target.value)} />
-                                        </div>
-                                        <div className="form-group full-width">
-                                            <label className="form-label">Librador</label>
-                                            <input className="modern-input" value={librador} onChange={e => setLibrador(e.target.value)} />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label"><FiCalendar /> Emisión</label>
-                                            <input type="date" className="modern-input" value={fechaEmision} onChange={e => setFechaEmision(e.target.value)} />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label"><FiCalendar /> Vto.</label>
-                                            <input type="date" className="modern-input" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)} />
-                                        </div>
-                                    </div>
+                                    <CamposCheque
+                                        mostrar={true}
+                                        banco={banco}
+                                        setBanco={setBanco}
+                                        numeroCheque={numeroCheque}
+                                        setNumeroCheque={setNumeroCheque}
+                                        librador={librador}
+                                        setLibrador={setLibrador}
+                                        fechaEmision={fechaEmision}
+                                        setFechaEmision={setFechaEmision}
+                                        fechaCobro={fechaVencimiento}
+                                        setFechaCobro={setFechaVencimiento}
+                                    />
                                 </div>
                             )}
 

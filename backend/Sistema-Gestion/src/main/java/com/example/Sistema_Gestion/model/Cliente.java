@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name="cliente")
+@Table(name = "cliente")
 public class Cliente {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -18,47 +18,103 @@ public class Cliente {
     @Column(name = "direccion") // Agregar este campo
     private String direccion;
 
-    @Column(columnDefinition="TEXT")
+    @Column(name = "codigo_postal")
+    private String codigoPostal;
+
+    @Column(columnDefinition = "TEXT")
     private String notas;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     @PrePersist
-    public void prePersist(){
+    public void prePersist() {
         createdAt = updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
-    public void preUpdate(){
+    public void preUpdate() {
         updatedAt = LocalDateTime.now();
     }
 
     // Getters y Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public String getNombre() { return nombre; }
-    public void setNombre(String nombre) { this.nombre = nombre; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getDocumento() { return documento; }
-    public void setDocumento(String documento) { this.documento = documento; }
+    public String getNombre() {
+        return nombre;
+    }
 
-    public String getTelefono() { return telefono; }
-    public void setTelefono(String telefono) { this.telefono = telefono; }
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
 
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    public String getDocumento() {
+        return documento;
+    }
 
-    public String getDireccion() { return direccion; } // Nuevo getter
-    public void setDireccion(String direccion) { this.direccion = direccion; } // Nuevo setter
+    public void setDocumento(String documento) {
+        this.documento = documento;
+    }
 
-    public String getNotas() { return notas; }
-    public void setNotas(String notas) { this.notas = notas; }
+    public String getTelefono() {
+        return telefono;
+    }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public void setTelefono(String telefono) {
+        this.telefono = telefono;
+    }
 
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getDireccion() {
+        return direccion;
+    } // Nuevo getter
+
+    public void setDireccion(String direccion) {
+        this.direccion = direccion;
+    } // Nuevo setter
+
+    public String getCodigoPostal() {
+        return codigoPostal;
+    }
+
+    public void setCodigoPostal(String codigoPostal) {
+        this.codigoPostal = codigoPostal;
+    }
+
+    public String getNotas() {
+        return notas;
+    }
+
+    public void setNotas(String notas) {
+        this.notas = notas;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

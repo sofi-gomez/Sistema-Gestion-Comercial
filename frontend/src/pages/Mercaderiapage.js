@@ -1,45 +1,40 @@
-import React, { useEffect, useState } from "react";
-import { FiPlus, FiEdit2, FiTrash2, FiPackage, FiSearch, FiFilter } from "react-icons/fi";
+import React, { useState, useEffect } from "react";
+import {
+  FiPackage, FiSearch, FiEdit2, FiTrash2, FiPlus,
+  FiFilter, FiAlertCircle
+} from "react-icons/fi";
 import ProductoFormModal from "../components/ProductoFormModal";
 import Toast from "../components/Toast";
-import "../index.css";
+import { apiFetch } from "../utils/api";
+import { formatDateLocal } from "../utils/dateUtils";
 
 export default function MercaderiaPage() {
-  // ==================== ESTADOS DEL COMPONENTE ====================
-
-  const [productos, setProductos] = useState([]);// Lista de productos obtenidos del backend
-  const [loading, setLoading] = useState(true);// Indicador de carga mientras se obtienen los datos
-  const [modalOpen, setModalOpen] = useState(false);    // Control de apertura/cierre del modal de formulario
-  const [editing, setEditing] = useState(null); // Almacena el producto en edición (null si es nuevo producto)
-  const [searchTerm, setSearchTerm] = useState("");// Término de búsqueda para filtrar productos
-  const [filterActive, setFilterActive] = useState("all"); // Filtro por estado: "all", "active", "inactive"
-  const [showFilters, setShowFilters] = useState(false);// Muestra u oculta el panel de filtros avanzados
+  const [productos, setProductos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterActive, setFilterActive] = useState("all");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
   const [toast, setToast] = useState(null);
+  const [stockFilter, setStockFilter] = useState("all");
 
-  const API_URL = "http://localhost:8080/api/productos";  // URL base de la API REST
+  const isExpiring = (fecha) => {
+    if (!fecha) return false;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const parts = fecha.split('T')[0].split('-');
+    const fVenc = new Date(parts[0], parts[1] - 1, parts[2]);
+    const diff = (fVenc - hoy) / (1000 * 60 * 60 * 24);
+    return diff >= 0 && diff <= 30;
+  };
 
-  // ---------------- ALERTA DE PRODUCTOS POR VENCER ----------------
+  const API_URL = "/api/productos";
 
-  // Calcula productos que vencen en los próximos 30 días
-  const hoy = new Date();
-  const productosProximos = productos.filter(p => {
-    if (!p.fechaVencimiento) return false;
-    const fecha = new Date(p.fechaVencimiento);
-    const diff = (fecha - hoy) / (1000 * 60 * 60 * 24);
-    return diff >= 0 && diff <= 29; // Productos que vencen en 30 días
-  });
-
-  // Control para ocultar la alerta de vencimiento
-  const [ocultarAlerta, setOcultarAlerta] = useState(false);
-
-
-  // ==================== FUNCIONES DE API ====================
-
-  //Obtiene todos los productos desde el backend
   const fetchProductos = async () => {
     setLoading(true);
     try {
-      const res = await fetch(API_URL);
+      const res = await apiFetch(API_URL);
       const data = await res.json();
       setProductos(data);
     } catch (err) {
@@ -49,15 +44,13 @@ export default function MercaderiaPage() {
     }
   };
 
-  // Efecto que carga los productos al montar el componente
   useEffect(() => {
     fetchProductos();
   }, []);
 
-  //Elimina un producto después de confirmar con el usuario
   const handleDelete = async (id) => {
     if (!window.confirm("¿Seguro que quieres eliminar este producto?")) return;
-    await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+    await apiFetch(`${API_URL}/${id}`, { method: "DELETE" });
     fetchProductos();
     setToast({
       title: "Producto eliminado",
@@ -66,14 +59,12 @@ export default function MercaderiaPage() {
     });
   };
 
-  //Guarda un producto (crea nuevo o actualiza existente)
   const handleSave = async (producto) => {
     const method = producto.id ? "PUT" : "POST";
     const url = producto.id ? `${API_URL}/${producto.id}` : API_URL;
 
-    await fetch(url, {
+    await apiFetch(url, {
       method,
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(producto),
     });
 
@@ -101,7 +92,17 @@ export default function MercaderiaPage() {
       filterActive === "active" ? producto.activo :
         filterActive === "inactive" ? !producto.activo : true;
 
-    return matchesSearch && matchesFilter;
+    // Coincidencia con el filtro de stock/vencimiento (Tarjetas)
+    let matchesStock = true;
+    if (stockFilter === "low") {
+      matchesStock = producto.stock > 0 && producto.stock <= 10;
+    } else if (stockFilter === "empty") {
+      matchesStock = producto.stock <= 0;
+    } else if (stockFilter === "expiring") {
+      matchesStock = isExpiring(producto.fechaVencimiento);
+    }
+
+    return matchesSearch && matchesFilter && matchesStock;
   });
 
   // ----------- FUNCIONES DE COLORES SEGÚN FECHA DE VENCIMIENTO -----------
@@ -111,12 +112,14 @@ export default function MercaderiaPage() {
     if (!fechaVencimiento) return "normal";
 
     const hoy = new Date();
-    const fecha = new Date(fechaVencimiento);
+    hoy.setHours(0, 0, 0, 0);
+    const parts = fechaVencimiento.split('T')[0].split('-');
+    const fecha = new Date(parts[0], parts[1] - 1, parts[2]);
 
     const diffDias = (fecha - hoy) / (1000 * 60 * 60 * 24);
 
-    if (diffDias < 0) return "vencido";         // Vencido
-    if (diffDias <= 29) return "por-vencer";    // Quedan 30 días o menos
+    if (diffDias < 0) return "vencido";
+    if (diffDias <= 29) return "por-vencer";
 
     return "normal";                            // Todo ok
   };
@@ -159,10 +162,13 @@ export default function MercaderiaPage() {
         </div>
       </div>
 
-      {/*  ==================== PANEL DE ESTADÍSTICAS ==================== */}
+      {/*  ==================== PANEL DE ESTADÍSTICAS (FILTROS) ==================== */}
       <div className="stats-grid">
         {/* Total de productos */}
-        <div className="stat-card">
+        <div
+          className={`stat-card clickable ${stockFilter === 'all' ? 'active' : ''}`}
+          onClick={() => setStockFilter('all')}
+        >
           <div className="stat-icon total">
             <FiPackage />
           </div>
@@ -172,30 +178,39 @@ export default function MercaderiaPage() {
           </div>
         </div>
 
-        {/* Productos activos */}
-        <div className="stat-card">
-          <div className="stat-icon active">
-            <FiPackage />
+        {/* Poco stock (Umbral 10 solicitado) */}
+        <div
+          className={`stat-card clickable ${stockFilter === 'low' ? 'active' : ''}`}
+          onClick={() => setStockFilter('low')}
+        >
+          <div className="stat-icon warning-low">
+            <FiFilter />
           </div>
           <div className="stat-info">
-            <h3>{productos.filter(p => p.activo).length}</h3>
-            <p>Productos Activos</p>
+            <h3>{productos.filter(p => p.stock > 0 && p.stock <= 10).length}</h3>
+            <p>Poco Stock (≤10)</p>
           </div>
         </div>
 
-        {/* Productos con stock disponible */}
-        <div className="stat-card">
-          <div className="stat-icon stock">
-            <FiPackage />
+        {/* Por Vencer (Umbral 30 días solicitado) */}
+        <div
+          className={`stat-card clickable ${stockFilter === 'expiring' ? 'active' : ''}`}
+          onClick={() => setStockFilter('expiring')}
+        >
+          <div className="stat-icon expiring">
+            <FiAlertCircle />
           </div>
           <div className="stat-info">
-            <h3>{productos.filter(p => p.stock > 0).length}</h3>
-            <p>Con Stock</p>
+            <h3>{productos.filter(p => isExpiring(p.fechaVencimiento)).length}</h3>
+            <p>Por Vencer (30d)</p>
           </div>
         </div>
 
-        {/* Productos sin stock */}
-        <div className="stat-card">
+        {/* Sin stock */}
+        <div
+          className={`stat-card clickable ${stockFilter === 'empty' ? 'active' : ''}`}
+          onClick={() => setStockFilter('empty')}
+        >
           <div className="stat-icon out-of-stock">
             <FiPackage />
           </div>
@@ -341,11 +356,55 @@ export default function MercaderiaPage() {
                       </td>
 
                       <td className="price-cell">
-                        ${Number(producto.precioCosto || 0).toLocaleString()}
+                        {producto.precioCosto > 0 ? (
+                          <>
+                            <div>${Number(producto.precioCosto).toLocaleString()}</div>
+                            {producto.precioCostoUSD && (
+                              <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 2 }}>
+                                USD {Number(producto.precioCostoUSD).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              </div>
+                            )}
+                          </>
+                        ) : producto.precioCostoUSD ? (
+                          <span style={{
+                            background: "linear-gradient(135deg, #1e40af, #2563eb)",
+                            color: "white",
+                            padding: "3px 9px",
+                            borderRadius: "6px",
+                            fontSize: "0.8rem",
+                            fontWeight: 700
+                          }}>
+                            USD {Number(producto.precioCostoUSD).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          </span>
+                        ) : (
+                          <span style={{ color: "#475569" }}>—</span>
+                        )}
                       </td>
 
                       <td className="price-cell highlight">
-                        ${Number(producto.precioVenta || 0).toLocaleString()}
+                        {producto.precioVenta > 0 ? (
+                          <>
+                            <div>${Number(producto.precioVenta).toLocaleString()}</div>
+                            {producto.precioVentaUSD && (
+                              <div style={{ fontSize: "0.75rem", color: "#4ade80", marginTop: 2 }}>
+                                USD {Number(producto.precioVentaUSD).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              </div>
+                            )}
+                          </>
+                        ) : producto.precioVentaUSD ? (
+                          <span style={{
+                            background: "linear-gradient(135deg, #065f46, #059669)",
+                            color: "white",
+                            padding: "3px 9px",
+                            borderRadius: "6px",
+                            fontSize: "0.8rem",
+                            fontWeight: 700
+                          }}>
+                            USD {Number(producto.precioVentaUSD).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          </span>
+                        ) : (
+                          <span style={{ color: "#475569" }}>—</span>
+                        )}
                       </td>
 
                       <td className="unit-cell">
@@ -356,7 +415,7 @@ export default function MercaderiaPage() {
                       <td className="date-cell">
                         {producto.fechaVencimiento ? (
                           <span className="date-badge">
-                            {new Date(producto.fechaVencimiento).toLocaleDateString('es-AR')}
+                            {formatDateLocal(producto.fechaVencimiento)}
                           </span>
                         ) : (
                           <span className="no-date">-</span>

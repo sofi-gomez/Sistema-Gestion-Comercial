@@ -1,19 +1,29 @@
 import React, { useState, useEffect } from "react";
 import { FiCheckCircle, FiDollarSign } from "react-icons/fi";
 import CobroFormModal from "./CobroFormModal";
+import { apiFetch } from "../utils/api";
 
-const API_COBROS = "http://localhost:8080/api/cobros";
-const API_REMITOS = "http://localhost:8080/api/remitos";
+const API_COBROS = "/api/cobros";
+const API_REMITOS = "/api/remitos";
 
 export default function CobrosSection({ onUpdate }) {
     const [remitos, setRemitos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [cobrandoRemito, setCobrandoRemito] = useState(null);
+    const [expandedRows, setExpandedRows] = useState(new Set());
+
+    const toggleRow = (id) => {
+        const newExpanded = new Set(expandedRows);
+        if (newExpanded.has(id)) newExpanded.delete(id);
+        else newExpanded.add(id);
+        setExpandedRows(newExpanded);
+    };
 
     const fetchValorizados = async () => {
         try {
-            const res = await fetch(`${API_REMITOS}?estado=VALORIZADO`);
-            setRemitos(await res.json());
+            const res = await apiFetch(`${API_REMITOS}?estado=VALORIZADO`);
+            const data = await res.json();
+            setRemitos(Array.isArray(data) ? data : []);
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
     };
@@ -39,28 +49,64 @@ export default function CobrosSection({ onUpdate }) {
                             <tr>
                                 <th>Nº Remito</th>
                                 <th>Cliente</th>
+                                <th>Ítems</th>
                                 <th>Total</th>
                                 <th>Dólar</th>
-                                <th style={{ textAlign: "center" }}>Estado de Cobro</th>
+                                <th style={{ textAlign: "right", width: "1%", whiteSpace: "nowrap", paddingRight: "1.5rem" }}>Acción</th>
                             </tr>
                         </thead>
                         <tbody>
                             {remitos.map(r => (
-                                <tr key={r.id}>
-                                    <td className="sku-cell"><span className="sku-badge">#{r.numero}</span></td>
-                                    <td>{r.clienteNombre}</td>
-                                    <td className="price-cell">${r.total?.toLocaleString()}</td>
-                                    <td>{r.cotizacionDolar ? `$${r.cotizacionDolar}` : "-"}</td>
-                                    <td style={{ textAlign: "center" }}>
-                                        <button
-                                            className="btn-primary"
-                                            style={{ background: "#10b981", border: "none", padding: "6px 12px", fontSize: "0.85rem" }}
-                                            onClick={() => setCobrandoRemito(r)}
-                                        >
-                                            <FiDollarSign /> Cobrar
-                                        </button>
-                                    </td>
-                                </tr>
+                                <React.Fragment key={r.id}>
+                                    <tr className={expandedRows.has(r.id) ? "expanded-parent" : ""}>
+                                        <td className="sku-cell"><span className="sku-badge">#{r.numero}</span></td>
+                                        <td>{r.clienteNombre}</td>
+                                        <td>
+                                            <button
+                                                className="btn-modern secondary"
+                                                style={{ padding: "4px 8px", fontSize: "0.75rem", gap: "4px", display: "flex", alignItems: "center" }}
+                                                onClick={() => toggleRow(r.id)}
+                                            >
+                                                {expandedRows.has(r.id) ? "▲" : "▼"} {r.items?.length || 0} ítems
+                                            </button>
+                                        </td>
+                                        <td className="price-cell">${r.total?.toLocaleString()}</td>
+                                        <td>{r.cotizacionDolar ? `$${r.cotizacionDolar}` : "-"}</td>
+                                        <td style={{ textAlign: "right", width: "1%", whiteSpace: "nowrap", paddingRight: "1.5rem" }}>
+                                            <button
+                                                className="btn-primary"
+                                                style={{ background: "#10b981", border: "none", padding: "6px 16px", fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                                                onClick={() => setCobrandoRemito(r)}
+                                            >
+                                                <FiDollarSign size={14} /> Cobrar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {expandedRows.has(r.id) && (
+                                        <tr className="expanded-row">
+                                            <td colSpan="6" style={{ padding: "0" }}>
+                                                <div className="expanded-content-wrapper">
+                                                    <table className="modern-table mini">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Producto</th>
+                                                                <th style={{ textAlign: "center" }}>Cantidad</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {r.items?.map((it, idx) => (
+                                                                <tr key={idx}>
+                                                                    <td>{it.producto?.nombre || "Producto desconocido"}</td>
+                                                                    <td style={{ textAlign: "center" }}>{it.cantidad}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
                             ))}
                         </tbody>
                     </table>
@@ -70,6 +116,7 @@ export default function CobrosSection({ onUpdate }) {
             {cobrandoRemito && (
                 <CobroFormModal
                     clienteIdPreselected={cobrandoRemito.cliente?.id}
+                    remitoId={cobrandoRemito.id}
                     montoSugerido={cobrandoRemito.total}
                     onClose={() => setCobrandoRemito(null)}
                     onSaved={() => {

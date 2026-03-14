@@ -1,32 +1,75 @@
-import React, { useEffect, useState } from "react";
-import { FiPlus, FiUsers, FiSearch, FiArrowLeft, FiDollarSign, FiShoppingCart, FiEdit2, FiPhone, FiMail, FiMapPin, FiSave } from "react-icons/fi";
+import React, { useState, useEffect } from "react";
+import {
+  FiUsers, FiSearch, FiEdit2, FiPlus, FiPhone, FiMail,
+  FiMapPin, FiArrowLeft, FiShoppingCart, FiDollarSign, FiFileText
+} from "react-icons/fi";
 import ProveedoresFormModal from "../components/ProveedoresFormModal";
+import CompraFormModal from "../components/CompraFormModal";
+import PagoProveedorFormModal from "../components/PagoProveedorFormModal";
 import ProveedorCtaCteSection from "../components/ProveedorCtaCteSection";
 import ProveedorComprasSection from "../components/ProveedorComprasSection";
-import CompraFormModal from "../components/CompraFormModal";
+import ReporteProveedorTab from "../components/ReporteProveedorTab";
 import Toast from "../components/Toast";
-import "../index.css";
+import { apiFetch } from "../utils/api";
 
-const API = "http://localhost:8080/api/proveedores";
+const API = "/api/proveedores";
 
 export default function ProveedoresPage() {
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedProv, setSelectedProv] = useState(null);
-  const [viewDetail, setViewDetail] = useState(false); // ✅ Nuevo: controla si mostramos la lista o el detalle
-  const [activeTab, setActiveTab] = useState("ctacte");
   const [modalOpen, setModalOpen] = useState(false);
   const [compraModalOpen, setCompraModalOpen] = useState(false);
+  const [pagoModalOpen, setPagoModalOpen] = useState(false);
+  const [selectedProv, setSelectedProv] = useState(null);
+  const [viewDetail, setViewDetail] = useState(false);
+  const [activeTab, setActiveTab] = useState("compras");
   const [toast, setToast] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const res = await fetch(API);
+      const res = await apiFetch(API);
       setProveedores(await res.json() || []);
     } catch (e) { setProveedores([]); }
     finally { setLoading(false); }
+  };
+
+  const handleSaveProveedor = async (payload) => {
+    try {
+      const isEdit = !!payload.id;
+      const url = isEdit ? `${API}/${payload.id}` : API;
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await apiFetch(url, {
+        method,
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setToast({
+          title: isEdit ? "Proveedor actualizado" : "Proveedor creado",
+          message: `La información de ${payload.nombre} se guardó correctamente.`,
+          type: "success"
+        });
+        setModalOpen(false);
+        fetchAll();
+      } else {
+        const errorData = await res.json();
+        setToast({
+          title: "Error al guardar",
+          message: errorData.message || "Ocurrió un problema en el servidor.",
+          type: "error"
+        });
+      }
+    } catch (e) {
+      setToast({
+        title: "Error de conexión",
+        message: "No se pudo comunicar con el servidor.",
+        type: "error"
+      });
+    }
   };
 
   useEffect(() => { fetchAll(); }, []);
@@ -52,8 +95,11 @@ export default function ProveedoresPage() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: "10px" }}>
-                <button className="btn-primary" onClick={() => setCompraModalOpen(true)}>
+                <button className="btn-modern success" onClick={() => setCompraModalOpen(true)}>
                   <FiPlus /> Registrar Compra
+                </button>
+                <button className="btn-modern danger" style={{ background: "#e11d48", color: "white" }} onClick={() => setPagoModalOpen(true)}>
+                  <FiDollarSign /> Registrar Pago
                 </button>
                 <button className="icon-btn edit" onClick={() => setModalOpen(true)} title="Editar Proveedor">
                   <FiEdit2 />
@@ -62,14 +108,22 @@ export default function ProveedoresPage() {
             </div>
           </div>
 
-          <div className="tabs-container" style={{ display: "flex", gap: "10px", marginBottom: "20px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
-            <button className={`tab-btn ${activeTab === "ctacte" ? "active" : ""}`} onClick={() => setActiveTab("ctacte")}><FiDollarSign /> Cuenta e Historial</button>
-            <button className={`tab-btn ${activeTab === "compras" ? "active" : ""}`} onClick={() => setActiveTab("compras")}><FiShoppingCart /> Historial Compras</button>
+          <div className="tabs-container" style={{
+            display: "flex",
+            gap: "8px",
+            marginBottom: "24px",
+            paddingBottom: "12px",
+            borderBottom: "1px solid #e2e8f0"
+          }}>
+            <button className={`tab-btn-modern ${activeTab === "compras" ? "active" : ""}`} onClick={() => setActiveTab("compras")}><FiShoppingCart /> Historial Compras</button>
+            <button className={`tab-btn-modern ${activeTab === "ctacte" ? "active" : ""}`} onClick={() => setActiveTab("ctacte")}><FiDollarSign /> Historial de Pago</button>
+            <button className={`tab-btn-modern ${activeTab === "reporte" ? "active" : ""}`} onClick={() => setActiveTab("reporte")}><FiFileText /> Reporte</button>
           </div>
 
           <div className="tab-content">
-            {activeTab === "ctacte" && <ProveedorCtaCteSection proveedorId={selectedProv.id} />}
-            {activeTab === "compras" && <ProveedorComprasSection proveedorId={selectedProv.id} />}
+            {activeTab === "ctacte" && <ProveedorCtaCteSection proveedorId={selectedProv.id} refreshKey={refreshKey} />}
+            {activeTab === "compras" && <ProveedorComprasSection proveedorId={selectedProv.id} refreshKey={refreshKey} />}
+            {activeTab === "reporte" && <ReporteProveedorTab proveedorId={selectedProv.id} refreshKey={refreshKey} />}
           </div>
         </>
       ) : (
@@ -109,7 +163,7 @@ export default function ProveedoresPage() {
                       <th>Proveedor / CUIT</th>
                       <th>Contacto</th>
                       <th>Ubicación</th>
-                      <th>Acciones</th>
+                      <th style={{ textAlign: "center" }}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -131,15 +185,15 @@ export default function ProveedoresPage() {
                           <p style={{ margin: 0, fontSize: "0.9rem" }}><FiMapPin size={14} color="var(--muted)" /> {p.direccion || "-"}</p>
                         </td>
                         <td className="actions-cell">
-                          <div style={{ display: "flex", gap: "8px" }}>
+                          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                             <button className="icon-btn edit" onClick={() => { setSelectedProv(p); setViewDetail(false); setModalOpen(true); }} title="Editar"><FiEdit2 /></button>
                             <button
                               className="btn-primary"
                               style={{ padding: "6px 12px", fontSize: "0.85rem", gap: "6px" }}
-                              onClick={() => { setSelectedProv(p); setViewDetail(true); setActiveTab("ctacte"); }}
-                              title="Ver Cuenta e Historial"
+                              onClick={() => { setSelectedProv(p); setViewDetail(true); setActiveTab("compras"); }}
+                              title="Ver Historial de Compras"
                             >
-                              <FiDollarSign /> Cuenta e Historial
+                              <FiShoppingCart /> Historial de Compras
                             </button>
                             <button
                               className="btn-secondary"
@@ -148,6 +202,14 @@ export default function ProveedoresPage() {
                               title="Registrar Nueva Compra"
                             >
                               <FiPlus /> Nueva Compra
+                            </button>
+                            <button
+                              className="btn-secondary"
+                              style={{ padding: "6px 12px", fontSize: "0.85rem", gap: "6px", background: "#fef2f2", color: "#e11d48", border: "1px solid #fecaca" }}
+                              onClick={() => { setSelectedProv(p); setViewDetail(false); setPagoModalOpen(true); }}
+                              title="Registrar Pago"
+                            >
+                              <FiDollarSign /> Pago
                             </button>
                           </div>
                         </td>
@@ -165,7 +227,7 @@ export default function ProveedoresPage() {
         <ProveedoresFormModal
           proveedor={selectedProv}
           onClose={() => { setModalOpen(false); }}
-          onSave={() => { setModalOpen(false); fetchAll(); }}
+          onSave={handleSaveProveedor}
         />
       )}
 
@@ -176,9 +238,27 @@ export default function ProveedoresPage() {
           onSaved={() => {
             setCompraModalOpen(false);
             fetchAll();
+            setRefreshKey(prev => prev + 1); // ✅ Fuerza refresco de historial/reporte
             setToast({
               title: "Compra registrada",
               message: "El ingreso de mercadería se procesó correctamente.",
+              type: "success"
+            });
+          }}
+        />
+      )}
+
+      {pagoModalOpen && (
+        <PagoProveedorFormModal
+          proveedorIdPreselected={selectedProv?.id}
+          onClose={() => setPagoModalOpen(false)}
+          onSaved={() => {
+            setPagoModalOpen(false);
+            fetchAll();
+            setRefreshKey(prev => prev + 1);
+            setToast({
+              title: "Pago registrado",
+              message: "El pago al proveedor se ha guardado correctamente.",
               type: "success"
             });
           }}
@@ -196,23 +276,6 @@ export default function ProveedoresPage() {
         </div>
       )}
 
-      <style>{`
-                .tab-btn {
-                    padding: 10px 16px;
-                    border: none;
-                    background: transparent;
-                    color: var(--muted);
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    font-weight: 500;
-                    border-radius: 8px;
-                    transition: all 0.2s;
-                }
-                .tab-btn:hover { background: var(--bg); color: var(--text); }
-                .tab-btn.active { background: #e8f5e9; color: #2e7d32; }
-            `}</style>
     </div>
   );
 }

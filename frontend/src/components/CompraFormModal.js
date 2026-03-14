@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { FiPlus, FiTrash2, FiSave, FiX } from "react-icons/fi";
 import ProductoFormModal from "./ProductoFormModal";
+import { apiFetch } from "../utils/api";
 import "../index.css";
 
-const API_PROD = "http://localhost:8080/api/productos";
-const API_COMPRA = "http://localhost:8080/api/compras";
+const API_PROD = "/api/productos";
+const API_COMPRA = "/api/compras";
 
 export default function CompraFormModal({ proveedor, onClose, onSaved }) {
     const [productos, setProductos] = useState([]);
@@ -20,9 +21,13 @@ export default function CompraFormModal({ proveedor, onClose, onSaved }) {
     const [quickProdOpen, setQuickProdOpen] = useState(false);
     const [pendingItemIdx, setPendingItemIdx] = useState(null);
 
+    // Estado para el buscador de productos por fila
+    const [searchTerms, setSearchTerms] = useState({}); // { idx: "nombre..." }
+    const [showResults, setShowResults] = useState({}); // { idx: true/false }
+
     const fetchProds = async () => {
         try {
-            const res = await fetch(API_PROD);
+            const res = await apiFetch(API_PROD);
             if (res.ok) setProductos(await res.json());
         } catch (err) { console.error(err); }
         finally { setLoading(false); }
@@ -48,6 +53,7 @@ export default function CompraFormModal({ proveedor, onClose, onSaved }) {
         if (key === 'producto' && val === 'NEW') {
             setPendingItemIdx(idx);
             setQuickProdOpen(true);
+            setShowResults(prev => ({ ...prev, [idx]: false }));
             return;
         }
 
@@ -56,17 +62,29 @@ export default function CompraFormModal({ proveedor, onClose, onSaved }) {
             items[idx] = { ...items[idx], [key]: val };
             if (key === 'producto') {
                 const prod = productos.find(p => String(p.id) === String(val));
-                if (prod) items[idx].precioUnitario = prod.precioCosto || 0;
+                if (prod) {
+                    items[idx].precioUnitario = prod.precioCosto || 0;
+                    setSearchTerms(prev => ({ ...prev, [idx]: `${prod.nombre} (${prod.sku || 'S/S'})` }));
+                }
+                setShowResults(prev => ({ ...prev, [idx]: false }));
             }
             return { ...f, items };
         });
     };
 
+    const getFilteredProducts = (term) => {
+        if (!term) return [];
+        const t = term.toLowerCase();
+        return productos.filter(p =>
+            p.nombre.toLowerCase().includes(t) ||
+            (p.sku && p.sku.toLowerCase().includes(t))
+        ).slice(0, 8); // Limitar resultados para mejor rendimiento
+    };
+
     const handleQuickProductSave = async (payload) => {
         try {
-            const res = await fetch(API_PROD, {
+            const res = await apiFetch(API_PROD, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
             if (res.ok) {
@@ -113,9 +131,8 @@ export default function CompraFormModal({ proveedor, onClose, onSaved }) {
 
         setSaving(true);
         try {
-            const res = await fetch(API_COMPRA, {
+            const res = await apiFetch(API_COMPRA, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
             if (res.ok) { onSaved(); }
@@ -164,23 +181,64 @@ export default function CompraFormModal({ proveedor, onClose, onSaved }) {
                             <label className="form-label" style={{ fontWeight: "bold" }}>Items de la Compra</label>
                             {form.items.map((it, idx) => (
                                 <div key={idx} className="item-row" style={{ display: "grid", gridTemplateColumns: "1fr 100px 140px 40px", gap: "10px", alignItems: "center", marginBottom: "10px" }}>
-                                    <select
-                                        className="modern-input"
-                                        value={it.producto || ""}
-                                        onChange={e => updateItem(idx, 'producto', e.target.value)}
-                                        required
-                                        style={{ fontWeight: it.producto === 'NEW' ? 'bold' : 'normal' }}
-                                    >
-                                        <option value="">-- Seleccionar Producto --</option>
-                                        <option value="NEW" style={{ color: "var(--primary)", fontWeight: "bold" }}>+ Nuevo Producto...</option>
-                                        <hr />
-                                        {productos.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.sku || 'S/S'})</option>)}
-                                    </select>
+                                    <div style={{ position: "relative" }}>
+                                        <input
+                                            type="text"
+                                            className="modern-input"
+                                            placeholder="🔍 Buscar producto o SKU..."
+                                            value={searchTerms[idx] || ""}
+                                            autoComplete="off"
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setSearchTerms(prev => ({ ...prev, [idx]: val }));
+                                                setShowResults(prev => ({ ...prev, [idx]: true }));
+                                                if (!val) updateItem(idx, 'producto', null);
+                                            }}
+                                            onFocus={() => setShowResults(prev => ({ ...prev, [idx]: true }))}
+                                        />
+                                        {showResults[idx] && (searchTerms[idx] || "").length > 0 && (
+                                            <div className="search-dropdown" style={{
+                                                position: "absolute",
+                                                top: "100%",
+                                                left: 0,
+                                                right: 0,
+                                                background: "white",
+                                                border: "1px solid var(--border)",
+                                                borderRadius: "8px",
+                                                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                                zIndex: 1000,
+                                                maxHeight: "250px",
+                                                overflowY: "auto"
+                                            }}>
+                                                <div
+                                                    style={{ padding: "10px", color: "var(--primary)", fontWeight: "bold", cursor: "pointer", borderBottom: "1px solid #eee" }}
+                                                    onClick={() => updateItem(idx, 'producto', 'NEW')}
+                                                >
+                                                    + Crear nuevo producto: "{searchTerms[idx]}"
+                                                </div>
+                                                {getFilteredProducts(searchTerms[idx]).map(p => (
+                                                    <div
+                                                        key={p.id}
+                                                        style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #f8f8f8" }}
+                                                        onMouseDown={() => updateItem(idx, 'producto', p.id)} // onMouseDown para que ocurra antes del blur
+                                                        className="search-item-hover"
+                                                    >
+                                                        <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>{p.nombre}</div>
+                                                        <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>SKU: {p.sku || 'S/S'} | Stock: {p.stock}</div>
+                                                    </div>
+                                                ))}
+                                                {getFilteredProducts(searchTerms[idx]).length === 0 && (
+                                                    <div style={{ padding: "10px", color: "var(--muted)", fontSize: "0.85rem" }}>No se encontraron coincidencias.</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                     <input
                                         type="number"
                                         className="modern-input"
                                         value={it.cantidad}
                                         onChange={e => updateItem(idx, 'cantidad', e.target.value)}
+                                        onWheel={(e) => e.target.blur()}
                                         placeholder="Cant."
                                         min="1"
                                         required
@@ -190,6 +248,7 @@ export default function CompraFormModal({ proveedor, onClose, onSaved }) {
                                         className="modern-input"
                                         value={it.precioUnitario}
                                         onChange={e => updateItem(idx, 'precioUnitario', e.target.value)}
+                                        onWheel={(e) => e.target.blur()}
                                         placeholder="Costo Unit."
                                         step="0.01"
                                         required

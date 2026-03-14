@@ -1,10 +1,11 @@
 package com.example.Sistema_Gestion.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name="compra_item")
+@Table(name = "compra_item")
 public class CompraItem {
 
     @Id
@@ -12,21 +13,22 @@ public class CompraItem {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name="compra_id", nullable=false)
+    @JoinColumn(name = "compra_id", nullable = false)
+    @JsonBackReference
     private Compra compra;
 
     @ManyToOne
-    @JoinColumn(name="producto_id", nullable=false)
+    @JoinColumn(name = "producto_id", nullable = false)
     private Producto producto;
 
     // ✅ CAMBIO CRÍTICO: De BigDecimal a Integer
-    @Column(nullable=false)
+    @Column(nullable = false)
     private Integer cantidad;
 
-    @Column(precision=14, scale=2, nullable=false)
+    @Column(precision = 14, scale = 2, nullable = false)
     private BigDecimal precioUnitario;
 
-    @Column(precision=14, scale=2, nullable=false)
+    @Column(precision = 14, scale = 2, nullable = false)
     private BigDecimal subtotal;
 
     // =================== GETTERS Y SETTERS ===================

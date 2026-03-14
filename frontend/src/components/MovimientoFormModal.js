@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import CamposCheque from "./CamposCheque";
+import { apiFetch } from "../utils/api";
 import "../index.css";
 
 export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar }) {
@@ -8,6 +9,7 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
     const [importe, setImporte] = useState("");
     const [referencia, setReferencia] = useState("");
     const [descripcion, setDescripcion] = useState("");
+    const [entidad, setEntidad] = useState("");
 
     // Campos de cheque
     const [banco, setBanco] = useState("");
@@ -17,7 +19,7 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
     const [fechaCobro, setFechaCobro] = useState("");
     const [fechaVencimiento, setFechaVencimiento] = useState("");
 
-    const API_BASE = "http://localhost:8080/api/tesoreria";
+    const API_BASE = "/api/tesoreria";
 
     // ✅ Cargar datos al editar
     useEffect(() => {
@@ -52,6 +54,7 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
             importe: parseFloat(importe),
             referencia: referencia.trim() || null,
             descripcion: descripcion.trim() || null,
+            entidad: entidad.trim() || null,
         };
 
         // Agregar datos de cheque si el medio de pago es cheque
@@ -72,9 +75,8 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
 
             const method = movimientoEditar ? "PUT" : "POST";
 
-            const res = await fetch(url, {
+            const res = await apiFetch(url, {
                 method,
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(movimiento),
             });
 
@@ -144,9 +146,22 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
                                     step="0.01"
                                     value={importe}
                                     onChange={(e) => setImporte(e.target.value)}
+                                    onWheel={(e) => e.target.blur()}
                                     className="modern-input"
                                     placeholder="0.00"
                                     required
+                                />
+                            </div>
+
+                            {/* Entidad */}
+                            <div className="form-group">
+                                <label className="form-label">Entidad / Persona</label>
+                                <input
+                                    type="text"
+                                    value={entidad}
+                                    onChange={(e) => setEntidad(e.target.value)}
+                                    className="modern-input"
+                                    placeholder="Nombre del cliente o proveedor"
                                 />
                             </div>
 

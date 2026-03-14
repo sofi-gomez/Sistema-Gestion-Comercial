@@ -3,6 +3,7 @@ package com.example.Sistema_Gestion.controller;
 import com.example.Sistema_Gestion.model.Cliente;
 import com.example.Sistema_Gestion.service.ClienteService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,6 +12,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/clientes")
+@Slf4j
 public class ClienteController {
 
     private final ClienteService clienteService;
@@ -25,7 +27,7 @@ public class ClienteController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Cliente> obtenerPorId(@PathVariable Long id) {
+    public ResponseEntity<Cliente> obtenerPorId(@PathVariable("id") Long id) {
         Optional<Cliente> cliente = clienteService.buscarPorId(id);
         return cliente.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -33,26 +35,21 @@ public class ClienteController {
 
     @PostMapping
     public Cliente crear(@Valid @RequestBody Cliente cliente) {
+        log.info("Creando nuevo cliente: {}", cliente.getNombre());
         return clienteService.guardar(cliente);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Cliente> actualizar(@PathVariable Long id, @Valid @RequestBody Cliente cliente) {
-        try {
-            Cliente actualizado = clienteService.actualizar(id, cliente);
-            return ResponseEntity.ok(actualizado);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public Cliente actualizar(@PathVariable("id") Long id, @Valid @RequestBody Cliente cliente) {
+        log.info("Actualizando cliente ID: {}", id);
+        cliente.setId(id);
+        return clienteService.guardar(cliente);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        try {
-            clienteService.eliminar(id);
-            return ResponseEntity.noContent().build();
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<Void> eliminar(@PathVariable("id") Long id) {
+        log.info("Eliminando cliente ID: {}", id);
+        clienteService.eliminar(id);
+        return ResponseEntity.noContent().build();
     }
 }

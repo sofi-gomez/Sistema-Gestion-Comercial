@@ -2,10 +2,13 @@ package com.example.Sistema_Gestion.controller;
 
 import com.example.Sistema_Gestion.model.Compra;
 import com.example.Sistema_Gestion.service.CompraService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/compras")
+@Slf4j
 public class CompraController {
 
     private final CompraService compraService;
@@ -15,12 +18,23 @@ public class CompraController {
     }
 
     @PostMapping
-    public Compra registrarCompra(@RequestBody Compra compra) {
+    public Compra crear(@RequestBody Compra compra) {
+        if (compra.getProveedor() != null) {
+            log.info("Registrando nueva compra del proveedor: {}", compra.getProveedor().getNombre());
+        }
         return compraService.registrarCompra(compra);
     }
 
     @GetMapping("/proveedor/{proveedorId}")
-    public java.util.List<Compra> listarPorProveedor(@PathVariable Long proveedorId) {
+    public java.util.List<Compra> listarPorProveedor(@PathVariable("proveedorId") Long proveedorId) {
+        log.info("Listando compras del proveedor ID: {}", proveedorId);
         return compraService.listarPorProveedor(proveedorId);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable("id") Long id) {
+        log.info("Eliminando compra ID: {}", id);
+        compraService.eliminarCompra(id);
+        return ResponseEntity.noContent().build();
     }
 }

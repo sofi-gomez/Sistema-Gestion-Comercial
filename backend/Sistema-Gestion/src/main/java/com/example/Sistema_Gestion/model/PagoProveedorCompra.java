@@ -16,13 +16,15 @@ public class PagoProveedorCompra {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "pago_proveedor_id", nullable = false)
     @JsonBackReference("pago-compras")
     private PagoProveedor pagoProveedor;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "compra_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({ "items", "proveedor", "hibernateLazyInitializer",
+            "handler" })
     private Compra compra;
 
     /** Importe de este pago aplicado a esta compra */

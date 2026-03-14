@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { FiPlus, FiDollarSign, FiSearch, FiTrendingUp, FiTrendingDown, FiEdit2 } from "react-icons/fi";
 import MovimientoFormModal from "../components/MovimientoFormModal";
+import { formatDateLocal } from "../utils/dateUtils";
+import { apiFetch } from "../utils/api";
 
-const API_BASE = "http://localhost:8080/api/tesoreria";
+const API_BASE = "/api/tesoreria";
 
 export default function CajaDiariaSection() {
     const [movimientos, setMovimientos] = useState([]);
@@ -10,11 +12,12 @@ export default function CajaDiariaSection() {
     const [modalOpen, setModalOpen] = useState(false);
     const [movimientoEditar, setMovimientoEditar] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [tipoFilter, setTipoFilter] = useState("all"); // "all", "INGRESO", "EGRESO"
 
     const fetchAll = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}`);
+            const res = await apiFetch(`${API_BASE}`);
             const data = await res.json();
             setMovimientos(data || []);
         } catch (err) {
@@ -29,34 +32,48 @@ export default function CajaDiariaSection() {
 
     const handleSaved = () => { setModalOpen(false); setMovimientoEditar(null); fetchAll(); };
 
-    const filtered = movimientos.filter(m =>
-        m.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.referencia?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filtered = movimientos.filter(m => {
+        const matchesSearch = m.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            m.referencia?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            m.entidad?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const ingresos = movimientos.filter(m => !m.anulado && m.tipo?.toUpperCase() === 'INGRESO').reduce((acc, m) => acc + Number(m.importe || 0), 0);
-    const egresos = movimientos.filter(m => !m.anulado && m.tipo?.toUpperCase() === 'EGRESO').reduce((acc, m) => acc + Number(m.importe || 0), 0);
-    const saldo = ingresos - egresos;
+        const matchesTipo = tipoFilter === "all" ? true : m.tipo?.toUpperCase() === tipoFilter;
+
+        return matchesSearch && matchesTipo;
+    });
+
+    const ingresosT = movimientos.filter(m => !m.anulado && m.tipo?.toUpperCase() === 'INGRESO').reduce((acc, m) => acc + Number(m.importe || 0), 0);
+    const egresosT = movimientos.filter(m => !m.anulado && m.tipo?.toUpperCase() === 'EGRESO').reduce((acc, m) => acc + Number(m.importe || 0), 0);
+    const saldo = ingresosT - egresosT;
 
     return (
         <div className="caja-diaria-section">
             <div className="stats-grid" style={{ marginBottom: "2rem" }}>
-                <div className="stat-card">
+                <div
+                    className={`stat-card clickable ${tipoFilter === 'INGRESO' ? 'active' : ''}`}
+                    onClick={() => setTipoFilter(tipoFilter === 'INGRESO' ? 'all' : 'INGRESO')}
+                >
                     <div className="stat-icon total"><FiTrendingUp /></div>
                     <div className="stat-info">
-                        <h3>${ingresos.toLocaleString()}</h3>
+                        <h3>${ingresosT.toLocaleString()}</h3>
                         <p>Ingresos</p>
                     </div>
                 </div>
-                <div className="stat-card">
-                    <div className="stat-icon active"><FiTrendingDown /></div>
+                <div
+                    className={`stat-card clickable ${tipoFilter === 'EGRESO' ? 'active' : ''}`}
+                    onClick={() => setTipoFilter(tipoFilter === 'EGRESO' ? 'all' : 'EGRESO')}
+                >
+                    <div className="stat-icon out-of-stock"><FiTrendingDown /></div>
                     <div className="stat-info">
-                        <h3>${egresos.toLocaleString()}</h3>
+                        <h3>${egresosT.toLocaleString()}</h3>
                         <p>Egresos</p>
                     </div>
                 </div>
-                <div className="stat-card">
-                    <div className="stat-icon stock"><FiDollarSign /></div>
+                <div
+                    className={`stat-card clickable ${tipoFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setTipoFilter('all')}
+                >
+                    <div className="stat-icon total" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}><FiDollarSign /></div>
                     <div className="stat-info">
                         <h3>${saldo.toLocaleString()}</h3>
                         <p>Saldo Actual</p>
@@ -88,6 +105,7 @@ export default function CajaDiariaSection() {
                                 <th>Fecha</th>
                                 <th>Tipo</th>
                                 <th>Medio</th>
+                                <th>Entidad</th>
                                 <th>Importe</th>
                                 <th>Descripción</th>
                                 <th>Acciones</th>
@@ -96,9 +114,10 @@ export default function CajaDiariaSection() {
                         <tbody>
                             {filtered.map(m => (
                                 <tr key={m.id} style={m.anulado ? { opacity: 0.6, textDecoration: 'line-through' } : {}}>
-                                    <td>{new Date(m.fecha || m.createdAt).toLocaleDateString()}</td>
+                                    <td>{formatDateLocal(m.fecha || m.createdAt)}</td>
                                     <td><span className={`status-badge ${m.tipo?.toUpperCase() === 'INGRESO' ? 'active' : 'inactive'}`}>{m.tipo}</span></td>
                                     <td>{m.medioPago?.replace(/_/g, ' ')}</td>
+                                    <td style={{ fontWeight: "500", color: "var(--text)" }}>{m.entidad || "-"}</td>
                                     <td className={m.tipo?.toUpperCase() === 'INGRESO' ? 'highlight' : 'danger'}>${m.importe.toLocaleString()}</td>
                                     <td>{m.descripcion}</td>
                                     <td>{!m.anulado && <button onClick={() => { setMovimientoEditar(m); setModalOpen(true); }} className="icon-btn edit"><FiEdit2 /></button>}</td>

@@ -1,40 +1,54 @@
 package com.example.Sistema_Gestion.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name="compra")
+@Table(name = "compra")
 
 public class Compra {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable=false, unique=true)
+    @Column(nullable = false, unique = true)
     private Long numero;
 
     private LocalDateTime fecha;
 
     @ManyToOne
-    @JoinColumn(name="proveedor_id", nullable=false)
+    @JoinColumn(name = "proveedor_id", nullable = false)
     private Proveedor proveedor;
 
-    @Column(precision=14,scale=2)
+    @Column(precision = 14, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
     private String estado;
-    @Column(columnDefinition="TEXT")
+    @Column(columnDefinition = "TEXT")
     private String anotaciones;
 
-    @OneToMany(mappedBy="compra", cascade=CascadeType.ALL, orphanRemoval=true)
+    @OneToMany(mappedBy = "compra", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @JsonManagedReference
     private List<CompraItem> items;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    @PrePersist public void prePersist(){ fecha = LocalDateTime.now(); createdAt=updatedAt=LocalDateTime.now();}
-    @PreUpdate public void preUpdate(){ updatedAt=LocalDateTime.now();}
+
+    @PrePersist
+    public void prePersist() {
+        if (fecha == null) {
+            fecha = LocalDateTime.now();
+        }
+        createdAt = updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
     public String getAnotaciones() {
         return anotaciones;
