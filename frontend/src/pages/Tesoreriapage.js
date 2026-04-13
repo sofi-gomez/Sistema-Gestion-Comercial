@@ -1,11 +1,15 @@
 import React, { useState } from "react";
-import { FiDollarSign, FiCreditCard, FiActivity } from "react-icons/fi";
+import { useSearchParams } from "react-router-dom";
+import { FiDollarSign, FiCreditCard, FiActivity, FiBarChart2 } from "react-icons/fi";
 import CajaDiariaSection from "../components/CajaDiariaSection";
 import CarteraChequesSection from "../components/CarteraChequesSection";
+import ResumenDiaSection from "../components/ResumenDiaSection";
 import "../index.css";
 
 export default function TesoreriaPage() {
-    const [activeTab, setActiveTab] = useState("caja");
+    const [searchParams] = useSearchParams();
+    const tabInicial = searchParams.get("tab") || "caja";
+    const [activeTab, setActiveTab] = useState(tabInicial);
 
     return (
         <div className="mercaderia-container">
@@ -36,6 +40,12 @@ export default function TesoreriaPage() {
                     <FiActivity /> Caja Diaria
                 </button>
                 <button
+                    className={`tab-btn ${activeTab === "resumen" ? "active" : ""}`}
+                    onClick={() => setActiveTab("resumen")}
+                >
+                    <FiBarChart2 /> Resumen del Día
+                </button>
+                <button
                     className={`tab-btn ${activeTab === "cheques" ? "active" : ""}`}
                     onClick={() => setActiveTab("cheques")}
                 >
@@ -45,6 +55,7 @@ export default function TesoreriaPage() {
 
             <div className="tab-content">
                 {activeTab === "caja" && <CajaDiariaSection />}
+                {activeTab === "resumen" && <ResumenDiaSection />}
                 {activeTab === "cheques" && <CarteraChequesSection />}
             </div>
 

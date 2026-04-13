@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FiDollarSign, FiCreditCard, FiHash, FiUser } from "react-icons/fi";
+import { FiDollarSign, FiCreditCard, FiHash, FiUser, FiDownload } from "react-icons/fi";
 import CamposCheque from "./CamposCheque";
 import { apiFetch } from "../utils/api";
 
@@ -12,6 +12,7 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
     const [monto, setMonto] = useState(montoSugerido || "");
     const [medioPago, setMedioPago] = useState("EFECTIVO");
     const [observaciones, setObservaciones] = useState("");
+    const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
     const [loading, setLoading] = useState(false);
 
     // Campos de cheque
@@ -19,6 +20,7 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
     const [numeroCheque, setNumeroCheque] = useState("");
     const [librador, setLibrador] = useState("");
     const [fechaEmision, setFechaEmision] = useState("");
+    const [fechaCobro, setFechaCobro] = useState("");
     const [fechaVencimiento, setFechaVencimiento] = useState("");
 
     useEffect(() => {
@@ -30,6 +32,25 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
         }
     }, [clienteIdPreselected]);
 
+    const downloadRecibo = async (cobroId) => {
+        try {
+            const res = await apiFetch(`${API_COBROS}/${cobroId}/recibo/pdf`);
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `recibo_cobro_${cobroId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            }
+        } catch (e) {
+            console.error("Error descargando recibo:", e);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!clienteId || !monto || parseFloat(monto) <= 0) {
@@ -39,8 +60,8 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
 
         const medioPagoCheque = medioPago.includes("CHEQUE");
         if (medioPagoCheque) {
-            if (!banco || !numeroCheque || !fechaEmision || !fechaVencimiento) {
-                alert("Por favor complete todos los campos obligatorios del cheque (Banco, Número, Emisión y Vencimiento).");
+            if (!banco || !numeroCheque || !fechaEmision || !fechaCobro) {
+                alert("Por favor complete todos los campos obligatorios del cheque (Banco, Número, Emisión y Fecha de Cobro).");
                 return;
             }
         }
@@ -51,6 +72,7 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                 cobro: {
                     cliente: { id: parseInt(clienteId) },
                     totalCobrado: parseFloat(monto),
+                    fecha: fecha,
                     observaciones: observaciones.trim() || `Cobro en ${medioPago.toLowerCase()}`
                 },
                 importesPorRemito: remitoId ? { [remitoId]: parseFloat(monto) } : {},
@@ -63,7 +85,8 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                         numeroCheque: medioPago.includes("CHEQUE") ? numeroCheque : null,
                         librador: medioPago.includes("CHEQUE") ? librador : null,
                         fechaEmision: medioPago.includes("CHEQUE") ? fechaEmision : null,
-                        fechaVencimiento: medioPago.includes("CHEQUE") ? fechaVencimiento : null
+                        fechaCobro: medioPago.includes("CHEQUE") ? fechaCobro : null,
+                        fechaVencimiento: medioPago.includes("CHEQUE") ? (fechaVencimiento || null) : null
                     }
                 ]
             };
@@ -74,6 +97,10 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
             });
 
             if (res.ok) {
+                const savedCobro = await res.json();
+                if (window.confirm("¡Cobro registrado con éxito! ¿Deseas descargar el recibo de cobro ahora?")) {
+                    await downloadRecibo(savedCobro.id);
+                }
                 onSaved();
             } else {
                 const errData = await res.json();
@@ -154,6 +181,17 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                                         <option value="MERCADO_PAGO">Mercado Pago</option>
                                     </select>
                                 </div>
+
+                                <div className="form-group">
+                                    <label className="form-label"><FiCreditCard /> Fecha del Cobro *</label>
+                                    <input
+                                        type="date"
+                                        className="modern-input"
+                                        value={fecha}
+                                        onChange={e => setFecha(e.target.value)}
+                                        required
+                                    />
+                                </div>
                             </div>
 
                             {esCheque && (
@@ -169,8 +207,8 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                                         setLibrador={setLibrador}
                                         fechaEmision={fechaEmision}
                                         setFechaEmision={setFechaEmision}
-                                        fechaCobro={fechaVencimiento}
-                                        setFechaCobro={setFechaVencimiento}
+                                        fechaCobro={fechaCobro}
+                                        setFechaCobro={setFechaCobro}
                                     />
                                 </div>
                             )}

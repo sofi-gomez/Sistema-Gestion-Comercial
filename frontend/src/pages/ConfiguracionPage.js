@@ -248,6 +248,22 @@ export default function ConfiguracionPage() {
                                 </div>
 
                                 <div className="input-field flex-1">
+                                    <label>IVA por defecto (%)</label>
+                                    <div className="price-input-wrapper">
+                                        <input
+                                            type="number"
+                                            className="highlight-input"
+                                            value={config.porcentajeIvaDefault}
+                                            onChange={e => setConfig({ ...config, porcentajeIvaDefault: parseFloat(e.target.value) })}
+                                            placeholder="Ej: 21"
+                                            onWheel={(e) => e.target.blur()}
+                                        />
+                                        <span className="currency-prefix" style={{ left: "auto", right: "14px" }}>%</span>
+                                    </div>
+                                    <p className="field-hint">IVA sugerido al registrar compras (ej: 21).</p>
+                                </div>
+
+                                <div className="input-field flex-1">
                                     <label>Umbral de Stock Crítico</label>
                                     <input
                                         type="number"

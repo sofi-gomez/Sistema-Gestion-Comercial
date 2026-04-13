@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   FiPackage, FiSearch, FiEdit2, FiTrash2, FiPlus,
-  FiFilter, FiAlertCircle
+  FiFilter, FiAlertCircle, FiEye, FiEyeOff
 } from "react-icons/fi";
 import ProductoFormModal from "../components/ProductoFormModal";
 import Toast from "../components/Toast";
@@ -18,6 +18,14 @@ export default function MercaderiaPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [toast, setToast] = useState(null);
   const [stockFilter, setStockFilter] = useState("all");
+  const [showCostPrices, setShowCostPrices] = useState(() => {
+    const saved = localStorage.getItem("showCostPrices");
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("showCostPrices", JSON.stringify(showCostPrices));
+  }, [showCostPrices]);
 
   const isExpiring = (fecha) => {
     if (!fecha) return false;
@@ -243,6 +251,16 @@ export default function MercaderiaPage() {
             <FiFilter />
             Filtros
           </button>
+          
+          <button
+            className={`filter-toggle ${!showCostPrices ? 'active' : ''}`}
+            onClick={() => setShowCostPrices(!showCostPrices)}
+            title={showCostPrices ? "Ocultar precios de costo" : "Mostrar precios de costo"}
+            style={{ marginLeft: '10px' }}
+          >
+            {showCostPrices ? <FiEye /> : <FiEyeOff />}
+            {showCostPrices ? "Ocultar Costos" : "Mostrar Costos"}
+          </button>
         </div>
 
         {/* Panel de filtros (se muestra condicionalmente) */}
@@ -356,7 +374,9 @@ export default function MercaderiaPage() {
                       </td>
 
                       <td className="price-cell">
-                        {producto.precioCosto > 0 ? (
+                        {!showCostPrices ? (
+                          <span style={{ color: "#94a3b8", letterSpacing: "2px" }}>****</span>
+                        ) : producto.precioCosto > 0 ? (
                           <>
                             <div>${Number(producto.precioCosto).toLocaleString()}</div>
                             {producto.precioCostoUSD && (

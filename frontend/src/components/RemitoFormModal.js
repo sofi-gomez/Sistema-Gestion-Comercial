@@ -23,12 +23,25 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
     const [searchTerms, setSearchTerms] = useState({});
     const [showResults, setShowResults] = useState({});
 
+    // Estados para el buscador de clientes
+    const [clienteSearchTerm, setClienteSearchTerm] = useState("");
+    const [showClienteResults, setShowClienteResults] = useState(false);
+
     const getFilteredProducts = (term) => {
         if (!term) return [];
         const t = term.toLowerCase();
         return productos.filter(p =>
             p.nombre.toLowerCase().includes(t) ||
             (p.sku && p.sku.toLowerCase().includes(t))
+        ).slice(0, 8);
+    };
+
+    const getFilteredClientes = (term) => {
+        if (!term) return clientes.slice(0, 8);
+        const t = term.toLowerCase();
+        return clientes.filter(c =>
+            (c.nombre && c.nombre.toLowerCase().includes(t)) ||
+            (c.documento && c.documento.toLowerCase().includes(t))
         ).slice(0, 8);
     };
 
@@ -92,6 +105,7 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
                 observaciones: remito.observaciones ?? "",
                 items: initialItems
             });
+            setClienteSearchTerm(remito.clienteNombre ?? (remito.cliente?.nombre ?? ""));
         } else {
             const hoy = new Date().toISOString().split('T')[0];
             setSearchTerms({});
@@ -106,8 +120,9 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
                 observaciones: "",
                 items: [{ producto: null, cantidad: 1, notas: "" }]
             }));
+            setClienteSearchTerm("");
         }
-    }, [remito]);
+    }, [remito, clientes.length]);
 
     const addItem = () => {
         setForm(prev => ({
@@ -153,8 +168,7 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
         });
     };
 
-    const handleClienteChange = (id) => {
-        const c = clientes.find(x => String(x.id) === String(id));
+    const handleClienteChange = (c) => {
         if (!c) return;
         setForm(prev => ({
             ...prev,
@@ -164,6 +178,8 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
             clienteCodigoPostal: c.codigoPostal || "",
             clienteAclaracion: c.condicionIva || ""
         }));
+        setClienteSearchTerm(c.nombre || "");
+        setShowClienteResults(false);
     };
 
     const handleSubmit = async (e) => {
@@ -258,18 +274,40 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
 
                             <div className="form-group full-width">
                                 <label className="form-label">Cliente</label>
-                                <select
-                                    className="modern-input"
-                                    value={form.cliente?.id || ""}
-                                    onChange={e => handleClienteChange(e.target.value)}
-                                >
-                                    <option value="">-- Seleccionar cliente --</option>
-                                    {clientes.map(c => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.nombre}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div style={{ position: "relative" }}>
+                                    <input
+                                        type="text"
+                                        className="modern-input"
+                                        placeholder="🔍 Buscar por nombre o documento..."
+                                        value={clienteSearchTerm || form.clienteNombre || ""}
+                                        autoComplete="off"
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setClienteSearchTerm(val);
+                                            setShowClienteResults(true);
+                                            if (!val) {
+                                                setForm(prev => ({ ...prev, cliente: null, clienteNombre: "" }));
+                                            }
+                                        }}
+                                        onFocus={() => setShowClienteResults(true)}
+                                    />
+                                    {showClienteResults && (
+                                        <ul className="autocomplete-dropdown" style={{ width: '100%', top: '100%' }}>
+                                            {getFilteredClientes(clienteSearchTerm).map(c => (
+                                                <li key={c.id} onClick={() => handleClienteChange(c)}>
+                                                    <div className="prod-name">{c.nombre}</div>
+                                                    <div className="prod-sku">
+                                                        {c.documento ? `Documento: ${c.documento}` : "Sin documento"} 
+                                                        {c.direccion ? ` | ${c.direccion}` : ""}
+                                                    </div>
+                                                </li>
+                                            ))}
+                                            {getFilteredClientes(clienteSearchTerm).length === 0 && (
+                                                <li className="no-results">No se encontraron clientes</li>
+                                            )}
+                                        </ul>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="form-group">

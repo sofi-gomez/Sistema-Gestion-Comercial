@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   FiUsers, FiSearch, FiEdit2, FiPlus, FiPhone, FiMail,
   FiMapPin, FiArrowLeft, FiShoppingCart, FiDollarSign, FiFileText
@@ -26,6 +27,9 @@ export default function ProveedoresPage() {
   const [activeTab, setActiveTab] = useState("compras");
   const [toast, setToast] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [pagoParaEditar, setPagoParaEditar] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const fetchAll = async () => {
     setLoading(true);
@@ -74,6 +78,23 @@ export default function ProveedoresPage() {
 
   useEffect(() => { fetchAll(); }, []);
 
+  // Lógica de Deep Linking desde Tesorería u otras áreas
+  useEffect(() => {
+    if (proveedores.length > 0 && location.state && location.state.autoOpenProveedorId) {
+      const p = proveedores.find(prov => prov.id === location.state.autoOpenProveedorId);
+      if (p) {
+        setSelectedProv(p);
+        setViewDetail(true);
+        if (location.state.autoOpenTab) {
+          setActiveTab(location.state.autoOpenTab);
+        }
+        
+        // Limpiamos el state para que no se auto-abra repetidamente si el usuario navega
+        navigate('.', { replace: true, state: {} });
+      }
+    }
+  }, [proveedores, location.state, navigate]);
+
   const filtered = proveedores.filter(p =>
     p.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) || p.cuit?.includes(searchTerm)
   );
@@ -121,7 +142,13 @@ export default function ProveedoresPage() {
           </div>
 
           <div className="tab-content">
-            {activeTab === "ctacte" && <ProveedorCtaCteSection proveedorId={selectedProv.id} refreshKey={refreshKey} />}
+            {activeTab === "ctacte" && (
+              <ProveedorCtaCteSection 
+                proveedorId={selectedProv.id} 
+                refreshKey={refreshKey} 
+                onEditPago={(p) => { setPagoParaEditar(p); setPagoModalOpen(true); }}
+              />
+            )}
             {activeTab === "compras" && <ProveedorComprasSection proveedorId={selectedProv.id} refreshKey={refreshKey} />}
             {activeTab === "reporte" && <ReporteProveedorTab proveedorId={selectedProv.id} refreshKey={refreshKey} />}
           </div>
@@ -251,14 +278,16 @@ export default function ProveedoresPage() {
       {pagoModalOpen && (
         <PagoProveedorFormModal
           proveedorIdPreselected={selectedProv?.id}
-          onClose={() => setPagoModalOpen(false)}
+          pagoEditar={pagoParaEditar}
+          onClose={() => { setPagoModalOpen(false); setPagoParaEditar(null); }}
           onSaved={() => {
             setPagoModalOpen(false);
+            setPagoParaEditar(null);
             fetchAll();
             setRefreshKey(prev => prev + 1);
             setToast({
-              title: "Pago registrado",
-              message: "El pago al proveedor se ha guardado correctamente.",
+              title: pagoParaEditar ? "Pago actualizado" : "Pago registrado",
+              message: pagoParaEditar ? "Los cambios se guardaron correctamente." : "El pago al proveedor se ha guardado correctamente.",
               type: "success"
             });
           }}

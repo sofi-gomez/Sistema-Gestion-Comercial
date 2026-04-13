@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FiDownload, FiRefreshCw, FiInfo, FiFilter, FiTrendingUp, FiTrendingDown, FiPieChart, FiDollarSign, FiChevronDown, FiChevronUp, FiPackage, FiTrash2 } from "react-icons/fi";
+import { FiDownload, FiRefreshCw, FiInfo, FiFilter, FiTrendingUp, FiTrendingDown, FiPieChart, FiDollarSign, FiChevronDown, FiChevronUp, FiPackage, FiTrash2, FiPrinter } from "react-icons/fi";
 import { apiFetch } from "../utils/api";
 
 const API_PROVEEDORES = "/api/proveedores";
@@ -21,6 +21,28 @@ export default function ReporteProveedorTab({ proveedorId, refreshKey }) {
         if (newExpanded.has(idx)) newExpanded.delete(idx);
         else newExpanded.add(idx);
         setExpandedBlocks(newExpanded);
+    };
+
+    const downloadOrdenPago = async (pagoId) => {
+        try {
+            const res = await apiFetch(`/api/pagos-proveedor/${pagoId}/orden-pago/pdf`);
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `orden_pago_${pagoId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            } else {
+                alert("Error al descargar la orden de pago");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error de conexión");
+        }
     };
 
     const descargarPdf = async () => {
@@ -153,21 +175,30 @@ export default function ReporteProveedorTab({ proveedorId, refreshKey }) {
                             <div className="stat-icon" style={{ background: "#fef2f2", color: "#ef4444" }}><FiTrendingUp /></div>
                             <div className="stat-info">
                                 <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--muted)" }}>Total Compras (+)</p>
-                                <h3 style={{ margin: 0, fontSize: "1.4rem", color: "#ef4444" }}>${reporte.totalCompras.toLocaleString()}</h3>
+                                <h3 style={{ margin: 0, fontSize: "1.4rem", color: "#ef4444" }}>${(reporte.totalComprasARS || 0).toLocaleString()}</h3>
+                                {reporte.totalComprasUSD > 0 && (
+                                    <h4 style={{ margin: 0, fontSize: "1rem", color: "#ef4444", opacity: 0.8 }}>U$D {(reporte.totalComprasUSD || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h4>
+                                )}
                             </div>
                         </div>
                         <div className="stat-card" style={{ padding: "1.25rem", borderLeft: "4px solid #10b981" }}>
                             <div className="stat-icon" style={{ background: "#ecfdf5", color: "#10b981" }}><FiTrendingDown /></div>
                             <div className="stat-info">
                                 <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--muted)" }}>Total Pagos (-)</p>
-                                <h3 style={{ margin: 0, fontSize: "1.4rem", color: "#10b981" }}>${reporte.totalPagos.toLocaleString()}</h3>
+                                <h3 style={{ margin: 0, fontSize: "1.4rem", color: "#10b981" }}>${(reporte.totalPagosARS || 0).toLocaleString()}</h3>
+                                {reporte.totalPagosUSD > 0 && (
+                                    <h4 style={{ margin: 0, fontSize: "1rem", color: "#10b981", opacity: 0.8 }}>U$D {(reporte.totalPagosUSD || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h4>
+                                )}
                             </div>
                         </div>
                         <div className="stat-card highlight" style={{ padding: "1.25rem", borderLeft: "4px solid #059669", background: "linear-gradient(to right, #f0fdf4, white)" }}>
                             <div className="stat-icon" style={{ background: "#10b981", color: "white" }}><FiDollarSign /></div>
                             <div className="stat-info">
                                 <p style={{ margin: 0, fontSize: "0.8rem", color: "#059669", fontWeight: "600" }}>Saldo Final</p>
-                                <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "800", color: "#047857" }}>${reporte.saldoFinal.toLocaleString()}</h3>
+                                <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "800", color: "#047857" }}>${(reporte.saldoFinalARS || 0).toLocaleString()}</h3>
+                                {(reporte.saldoFinalUSD > 0 || reporte.saldoFinalUSD < 0) && (
+                                    <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: "700", color: "#059669" }}>U$D {(reporte.saldoFinalUSD || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -252,13 +283,13 @@ export default function ReporteProveedorTab({ proveedorId, refreshKey }) {
                                                     )}
                                                 </td>
                                                 <td style={{ textAlign: "right", color: "var(--danger)" }}>
-                                                    {g.debe > 0 ? `$${g.debe.toLocaleString()}` : "-"}
+                                                    {g.debe > 0 ? (g.moneda === "USD" ? `U$D ${(g.debe || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `$${(g.debe || 0).toLocaleString()}`) : "-"}
                                                 </td>
                                                 <td style={{ textAlign: "right", color: "var(--success)" }}>
-                                                    {g.haber > 0 ? `$${g.haber.toLocaleString()}` : "-"}
+                                                    {g.haber > 0 ? (g.moneda === "USD" ? `U$D ${(g.haber || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `$${(g.haber || 0).toLocaleString()}`) : "-"}
                                                 </td>
                                                 <td style={{ textAlign: "right", fontWeight: "700" }}>
-                                                    ${g.saldo.toLocaleString()}
+                                                    {g.moneda === "USD" ? `U$D ` : `$ `}{(g.saldo || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                 </td>
                                                 <td style={{ textAlign: "right" }}>
                                                     <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
@@ -270,6 +301,25 @@ export default function ReporteProveedorTab({ proveedorId, refreshKey }) {
                                                             >
                                                                 {expandedBlocks.has(g.blockIndex) ? <FiChevronUp /> : <FiChevronDown />}
                                                                 {g.items.length} ítems
+                                                            </button>
+                                                        )}
+                                                        {g.tipoOriginal === 'PAGO' && (
+                                                            <button
+                                                                className="btn-modern secondary"
+                                                                style={{ 
+                                                                    padding: "4px 8px", 
+                                                                    fontSize: "0.75rem", 
+                                                                    color: "#8b5cf6", 
+                                                                    background: "#f5f3ff",
+                                                                    border: "1px solid #ddd6fe" 
+                                                                }}
+                                                                title="Descargar Orden de Pago"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    downloadOrdenPago(g.idOriginal);
+                                                                }}
+                                                            >
+                                                                <FiDownload /> OP
                                                             </button>
                                                         )}
                                                         <button
@@ -321,8 +371,12 @@ export default function ReporteProveedorTab({ proveedorId, refreshKey }) {
                                                                         <tr key={iIdx}>
                                                                             <td>{it.descripcion}</td>
                                                                             <td style={{ textAlign: "center" }}>{it.cantidad}</td>
-                                                                            <td style={{ textAlign: "right" }}>${it.precioUnitario?.toLocaleString()}</td>
-                                                                            <td style={{ textAlign: "right", fontWeight: "600" }}>${it.debe.toLocaleString()}</td>
+                                                                            <td style={{ textAlign: "right" }}>
+                                                                                {g.moneda === "USD" ? "U$D " : "$"}{(it.precioUnitario || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                                            </td>
+                                                                            <td style={{ textAlign: "right", fontWeight: "600" }}>
+                                                                                {g.moneda === "USD" ? "U$D " : "$"}{(it.debe || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                                            </td>
                                                                         </tr>
                                                                     ))}
                                                                 </tbody>

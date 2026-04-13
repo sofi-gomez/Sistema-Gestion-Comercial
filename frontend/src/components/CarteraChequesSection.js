@@ -10,6 +10,7 @@ export default function CarteraChequesSection() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [checkFilter, setCheckFilter] = useState("all"); // "all", "cobrados", "listos", "urgentes"
+    const [sortOrder, setSortOrder] = useState("desc"); // "asc" o "desc"
 
     const fetchCheques = async () => {
         setLoading(true);
@@ -59,7 +60,6 @@ export default function CarteraChequesSection() {
 
     const filtered = cheques.filter(c => {
         const term = searchTerm.toLowerCase().trim();
-        // Si no hay búsqueda, dejamos pasar todo. Si hay, buscamos coincidencia en campos.
         const matchesSearch = term === "" ||
             (c.banco?.toLowerCase() || "").includes(term) ||
             (c.numeroCheque?.toLowerCase() || "").includes(term) ||
@@ -75,6 +75,12 @@ export default function CarteraChequesSection() {
         }
 
         return matchesSearch && matchesCard;
+    });
+
+    const sortedAndFiltered = [...filtered].sort((a, b) => {
+        const dateA = new Date(a.fecha || a.createdAt);
+        const dateB = new Date(b.fecha || b.createdAt);
+        return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
     });
 
     // Cálculos para las tarjetas
@@ -129,8 +135,8 @@ export default function CarteraChequesSection() {
                 </div>
             </div>
 
-            <div className="filters-bar" style={{ marginBottom: "1.5rem" }}>
-                <div className="search-box" style={{ maxWidth: "400px" }}>
+            <div className="filters-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "20px", marginBottom: "1.5rem" }}>
+                <div className="search-box" style={{ flex: "1 1 300px", maxWidth: "450px" }}>
                     <FiSearch className="search-icon" />
                     <input
                         type="text"
@@ -139,6 +145,25 @@ export default function CarteraChequesSection() {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="search-input"
                     />
+                </div>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", background: "#f1f5f9", borderRadius: "10px", padding: "4px", border: "1px solid #e2e8f0" }}>
+                        <button
+                            className={`tab-btn-modern ${sortOrder === "desc" ? "active" : ""}`}
+                            style={{ padding: "8px 16px", fontSize: "0.85rem", height: "auto", borderRadius: "8px", borderBottom: "none" }}
+                            onClick={() => setSortOrder("desc")}
+                        >
+                            Más nuevos arriba
+                        </button>
+                        <button
+                            className={`tab-btn-modern ${sortOrder === "asc" ? "active" : ""}`}
+                            style={{ padding: "8px 16px", fontSize: "0.85rem", height: "auto", borderRadius: "8px", borderBottom: "none" }}
+                            onClick={() => setSortOrder("asc")}
+                        >
+                            Más viejos arriba
+                        </button>
+                    </div>
+                    <button className="btn-secondary" onClick={fetchCheques} style={{ padding: "10px 20px", borderRadius: "12px", fontSize: "0.9rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}>Actualizar</button>
                 </div>
             </div>
 
@@ -162,7 +187,7 @@ export default function CarteraChequesSection() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map(c => {
+                            {sortedAndFiltered.map(c => {
                                 const parts = c.fechaVencimiento?.split('T')[0].split('-');
                                 const fVenc = parts ? new Date(parts[0], parts[1] - 1, parts[2]) : null;
                                 const vencido = fVenc && fVenc < new Date();
