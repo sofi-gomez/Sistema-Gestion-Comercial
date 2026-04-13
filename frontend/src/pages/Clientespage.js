@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   FiUser, FiSearch, FiEdit2, FiPlus, FiPhone, FiMail,
   FiMapPin, FiFileText, FiArrowLeft, FiDollarSign
@@ -20,6 +21,8 @@ export default function ClientesPage() {
   const [viewDetail, setViewDetail] = useState(false);
   const [activeTab, setActiveTab] = useState("ctacte");
   const [toast, setToast] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const fetchAll = async () => {
     setLoading(true);
@@ -31,6 +34,22 @@ export default function ClientesPage() {
   };
 
   useEffect(() => { fetchAll(); }, []);
+
+  // Lógica de Deep Linking (Auto-abrir cliente si viene de Tesorería)
+  useEffect(() => {
+    if (clientes.length > 0 && location.state && location.state.autoOpenClienteId) {
+      const c = clientes.find(cli => cli.id === location.state.autoOpenClienteId);
+      if (c) {
+        setSelectedCliente(c);
+        setViewDetail(true);
+        if (location.state.autoOpenTab) {
+          setActiveTab(location.state.autoOpenTab);
+        }
+        // Limpiamos el state para evitar reaperturas accidentales
+        navigate('.', { replace: true, state: {} });
+      }
+    }
+  }, [clientes, location.state, navigate]);
 
   const filteredClientes = clientes.filter(c =>
     c.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||

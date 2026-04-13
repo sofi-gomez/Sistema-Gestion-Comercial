@@ -15,8 +15,8 @@ const API_PROVEEDORES = "/api/proveedores/dashboard-summary";
 
 const modules = [
     { title: "Mercadería", desc: "Productos, stock y movimientos", path: "/mercaderia", icon: <FiPackage />, color: "from-green-500 to-emerald-600" },
-    { title: "Clientes", desc: "Cuentas corrientes y remitos", path: "/clientes", icon: <FiUsers />, color: "from-blue-600 to-cyan-500" },
-    { title: "Remitos y Ventas", desc: "Flujo completo de salida", path: "/remitos", icon: <FiFileText />, color: "from-orange-500 to-amber-600" },
+    { title: "Clientes", desc: "Cuentas corrientes,cobros y remitos", path: "/clientes", icon: <FiUsers />, color: "from-blue-600 to-cyan-500" },
+    { title: "Remitos y Ventas", desc: "Crear,valorizar y cobrar remitos de ventas", path: "/remitos", icon: <FiFileText />, color: "from-orange-500 to-amber-600" },
     { title: "Proveedores", desc: "Compras, deudas y pagos", path: "/proveedores", icon: <FiTruck />, color: "from-purple-500 to-violet-600" },
     { title: "Tesorería", desc: "Caja diaria y cheques", path: "/tesoreria", icon: <FiDollarSign />, color: "from-gray-600 to-slate-700" },
     { title: "Herramientas", desc: "Precios, Excel y ajustes", path: "/configuracion", icon: <FiSettings />, color: "from-slate-400 to-slate-500" },
@@ -110,9 +110,16 @@ export default function HomePage() {
 
                         <div className="kpi-card" onClick={() => navigate("/proveedores")}>
                             <div className="kpi-icon-wrapper rose"><FiCreditCard /></div>
-                            <div className="kpi-info">
+                            <div className="kpi-info" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <p className="kpi-label">Cuentas por Pagar</p>
-                                <h3 className="kpi-value text-rose-600">${stats.cuentasPorPagar.toLocaleString()}</h3>
+                                <h3 className="kpi-value text-rose-600" style={{ fontSize: '1.25rem' }}>
+                                    ${(stats.cuentasPorPagarARS !== undefined ? stats.cuentasPorPagarARS : stats.cuentasPorPagar).toLocaleString()}
+                                </h3>
+                                {(stats.cuentasPorPagarUSD > 0 || stats.cuentasPorPagarUSD < 0) && (
+                                    <h3 className="kpi-value" style={{ fontSize: '1rem', color: '#059669' }}>
+                                        U$D {stats.cuentasPorPagarUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </h3>
+                                )}
                             </div>
                         </div>
 
@@ -124,7 +131,7 @@ export default function HomePage() {
                             </div>
                         </div>
 
-                        <div className="kpi-card alerts-card" onClick={() => navigate("/tesoreria")}>
+                        <div className="kpi-card alerts-card" onClick={() => navigate("/tesoreria?tab=cheques")}>
                             <div className="kpi-icon-wrapper purple"><FiCreditCard /></div>
                             <div className="kpi-info">
                                 <p className="kpi-label">Alertas de Cheques</p>

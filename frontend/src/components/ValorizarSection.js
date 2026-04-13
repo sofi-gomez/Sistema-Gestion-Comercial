@@ -47,6 +47,19 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
             alert("Debe ingresar una cotización válida para valorizar en dólares.");
             return;
         }
+        // Validar que todos los precios sean > 0
+        if (!selected || !selected.items || selected.items.length === 0) {
+            alert("El remito no tiene ítems.");
+            return;
+        }
+        const precioInvalido = selected.items.some(i => {
+            const p = parseFloat(precios[i.id]);
+            return !p || p <= 0;
+        });
+        if (precioInvalido) {
+            alert("Todos los precios unitarios deben ser mayores a 0 para poder valorizar.");
+            return;
+        }
 
         setSaving(true);
         try {
@@ -62,6 +75,7 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                 body: JSON.stringify(body),
             });
             if (res.ok) {
+                const data = await res.json();
                 setToast({
                     title: "Remito valorizado",
                     message: `El remito #${selected.numero} ha sido valorizado con éxito.`,
@@ -69,7 +83,7 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                 });
                 setSelected(null);
                 fetchPendientes();
-                onUpdate();
+                onUpdate(data);
             }
         } catch (e) {
             setToast({

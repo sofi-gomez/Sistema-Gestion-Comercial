@@ -7,6 +7,7 @@ import {
 import RemitoFormModal from "../components/RemitoFormModal";
 import ValorizarSection from "../components/ValorizarSection";
 import CobrosSection from "../components/CobrosSection";
+import CobroFormModal from "../components/CobroFormModal";
 import Toast from "../components/Toast";
 import ItemsTooltip from "../components/ItemsTooltip";
 import { apiFetch } from "../utils/api";
@@ -18,10 +19,11 @@ export default function RemitosPage() {
   const [remitos, setRemitos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("pendientes");
+  const [activeTab, setActiveTab] = useState("todos");
   const [modalRemitoOpen, setModalRemitoOpen] = useState(false);
   const [editingRemito, setEditingRemito] = useState(null);
   const [valorizingRemito, setValorizingRemito] = useState(null);
+  const [cobrandoRemito, setCobrandoRemito] = useState(null);
   const [toast, setToast] = useState(null);
   const [metrics, setMetrics] = useState({ ventasHoy: 0, ventasSemana: 0, ventasMes: 0 });
   const [expandedRows, setExpandedRows] = useState(new Set());
@@ -290,6 +292,7 @@ export default function RemitosPage() {
                   <th>Fecha</th>
                   <th>Cliente</th>
                   <th>Estado</th>
+                  <th>Observaciones</th>
                   <th>Total</th>
                   <th style={{ width: "1%", whiteSpace: "nowrap", textAlign: "center" }}>Acciones</th>
                 </tr>
@@ -314,10 +317,36 @@ export default function RemitosPage() {
                         {r.estado}
                       </span>
                     </td>
+                    <td style={{ fontSize: "0.85rem", color: "var(--muted)", maxWidth: "250px" }}>{r.observaciones || "-"}</td>
                     <td className="price-cell">{r.total ? `$${r.total.toLocaleString()}` : "-"}</td>
                     <td className="actions-cell">
                       <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                        {r.estado === "VALORIZADO" && (
+                          <button
+                            onClick={() => setCobrandoRemito(r)}
+                            className="icon-btn edit"
+                            style={{ color: "#10b981", background: "#f0fdf4" }}
+                            title="Registrar Cobro"
+                          >
+                            <FiDollarSign />
+                          </button>
+                        )}
                         <button onClick={() => handleDownloadPdf(r.id, r.numero)} className="icon-btn edit" title="Descargar PDF"><FiDownload /></button>
+                        <button 
+                          onClick={() => {
+                            if (r.estado !== "PENDIENTE") {
+                              if (!window.confirm(`Este remito está ${r.estado}. Editarlo podría afectar la consistencia de los precios y cobros. ¿Deseas continuar?`)) {
+                                return;
+                              }
+                            }
+                            setEditingRemito(r);
+                            setModalRemitoOpen(true);
+                          }} 
+                          className="icon-btn edit" 
+                          title="Editar"
+                        >
+                          <FiEdit2 />
+                        </button>
                         <button onClick={() => handleDeleteRemito(r.id, r.numero)} className="icon-btn delete" title="Eliminar"><FiTrash2 /></button>
                       </div>
                     </td>
@@ -352,6 +381,7 @@ export default function RemitosPage() {
                   <th>Nº</th>
                   <th>Fecha</th>
                   <th>Cliente</th>
+                  <th>Items</th>
                   <th>Total</th>
                   <th>Estado</th>
                 </tr>
@@ -371,18 +401,57 @@ export default function RemitosPage() {
                   )
                   .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
                   .map((v, idx) => (
-                    <tr key={`${v.id}-${idx}`}>
-                      <td>
-                        <span className="status-badge active" style={{ fontSize: '0.7rem' }}>
-                          {v.displayName}
-                        </span>
-                      </td>
-                      <td className="sku-cell"><span className="sku-badge">#{v.numeroInterno}</span></td>
-                      <td>{formatDateLocal(v.fecha)}</td>
-                      <td>{v.nombreCliente}</td>
-                      <td className="price-cell">${v.total?.toLocaleString()}</td>
-                      <td><span className="status-badge active">COBRADO</span></td>
-                    </tr>
+                    <React.Fragment key={`${v.id}-${idx}`}>
+                      <tr className={expandedRows.has(v.id) ? "expanded-parent" : ""}>
+                        <td>
+                          <span className="status-badge active" style={{ fontSize: '0.7rem' }}>
+                            {v.displayName}
+                          </span>
+                        </td>
+                        <td className="sku-cell"><span className="sku-badge">#{v.numeroInterno}</span></td>
+                        <td>{formatDateLocal(v.fecha)}</td>
+                        <td>{v.nombreCliente}</td>
+                        <td>
+                          <button
+                            className="btn-modern secondary"
+                            style={{ padding: "4px 8px", fontSize: "0.75rem", gap: "4px", display: "flex", alignItems: "center" }}
+                            onClick={() => toggleRow(v.id)}
+                          >
+                            {expandedRows.has(v.id) ? "▲" : "▼"} {v.items?.length || 0} ítems
+                          </button>
+                        </td>
+                        <td className="price-cell">${v.total?.toLocaleString()}</td>
+                        <td><span className="status-badge active">COBRADO</span></td>
+                      </tr>
+                      {expandedRows.has(v.id) && (
+                        <tr className="expanded-row">
+                          <td colSpan="7" style={{ padding: "0" }}>
+                            <div className="expanded-content-wrapper">
+                              <table className="modern-table mini">
+                                <thead>
+                                  <tr>
+                                    <th>Producto</th>
+                                    <th style={{ textAlign: "center" }}>Cantidad</th>
+                                    <th style={{ textAlign: "right" }}>Precio Unit.</th>
+                                    <th style={{ textAlign: "right" }}>Subtotal</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {v.items?.map((it, iidx) => (
+                                    <tr key={iidx}>
+                                      <td>{it.producto?.nombre || "Producto desconocido"}</td>
+                                      <td style={{ textAlign: "center" }}>{it.cantidad}</td>
+                                      <td style={{ textAlign: "right" }}>${it.precioUnitario?.toLocaleString() || "0"}</td>
+                                      <td style={{ textAlign: "right" }}>${(it.cantidad * (it.precioUnitario || 0)).toLocaleString()}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
               </tbody>
             </table>
@@ -422,9 +491,32 @@ export default function RemitosPage() {
         <ValorizarSection
           initialRemito={valorizingRemito}
           onClose={() => setValorizingRemito(null)}
-          onUpdate={() => {
+          onUpdate={(valorizedRemito) => {
             setValorizingRemito(null);
             fetchData();
+            if (valorizedRemito && valorizedRemito.id) {
+              if (window.confirm(`Remito #${valorizedRemito.numero} valorizado por $${valorizedRemito.total.toLocaleString()}. ¿Deseas registrar el cobro ahora?`)) {
+                setCobrandoRemito(valorizedRemito);
+              }
+            }
+          }}
+        />
+      )}
+
+      {cobrandoRemito && (
+        <CobroFormModal
+          clienteIdPreselected={cobrandoRemito.cliente?.id}
+          remitoId={cobrandoRemito.id}
+          montoSugerido={cobrandoRemito.total}
+          onClose={() => setCobrandoRemito(null)}
+          onSaved={() => {
+            setCobrandoRemito(null);
+            fetchData();
+            setToast({
+              title: "Cobro registrado",
+              message: `Se registró el pago del remito #${cobrandoRemito.numero}.`,
+              type: "success"
+            });
           }}
         />
       )}

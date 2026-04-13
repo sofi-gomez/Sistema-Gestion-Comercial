@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { FiDollarSign, FiClock, FiCheckCircle, FiTrash2 } from "react-icons/fi";
+import { FiDollarSign, FiClock, FiCheckCircle, FiTrash2, FiEdit2, FiDownload } from "react-icons/fi";
 import { formatDateLocal } from "../utils/dateUtils";
 import { apiFetch } from "../utils/api";
 
@@ -10,9 +10,32 @@ const formatMedioPago = (medio) => {
     return medio.replace(/_/g, " ").replace(/\w\S*/g, (w) => (w.replace(/^\w/, (c) => c.toUpperCase())));
 };
 
-export default function ProveedorCtaCteSection({ proveedorId, refreshKey }) {
-    const [saldo, setSaldo] = useState(0);
+export default function ProveedorCtaCteSection({ proveedorId, refreshKey, onEditPago }) {
+    const [saldoARS, setSaldoARS] = useState(0);
+    const [saldoUSD, setSaldoUSD] = useState(0);
     const [historial, setHistorial] = useState([]);
+
+    const downloadOrdenPago = async (pagoId) => {
+        try {
+            const res = await apiFetch(`${API_PAGOS}/${pagoId}/orden-pago/pdf`);
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `orden_pago_${pagoId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            } else {
+                alert("Error al descargar la orden de pago");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error de conexión");
+        }
+    };
 
     const fetchCtaCte = useCallback(async () => {
         try {
@@ -23,7 +46,8 @@ export default function ProveedorCtaCteSection({ proveedorId, refreshKey }) {
 
             if (resDeuda?.ok) {
                 const data = await resDeuda.json();
-                setSaldo(data.deuda || 0);
+                setSaldoARS(data.deudaARS || 0);
+                setSaldoUSD(data.deudaUSD || 0);
             }
             if (resHist?.ok) {
                 setHistorial(await resHist.json() || []);
@@ -56,14 +80,23 @@ export default function ProveedorCtaCteSection({ proveedorId, refreshKey }) {
 
     return (
         <div className="ctacte-section">
-            <div className="stats-grid" style={{ marginBottom: "2rem" }}>
+            <div className="stats-grid" style={{ marginBottom: "2rem", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
                 <div className="stat-card">
                     <div className={`stat-icon out-of-stock`}><FiDollarSign /></div>
                     <div className="stat-info">
-                        <h3>${saldo.toLocaleString()}</h3>
-                        <p>Deuda Total con Proveedor</p>
+                        <h3>${saldoARS.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
+                        <p>Deuda Total en ARS</p>
                     </div>
                 </div>
+                {(saldoUSD > 0 || saldoUSD < 0) && (
+                    <div className="stat-card">
+                        <div className={`stat-icon`} style={{background: '#d1fae5', color: '#059669'}}><FiDollarSign /></div>
+                        <div className="stat-info">
+                            <h3 style={{color: '#059669'}}>U$D {saldoUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
+                            <p>Deuda Total en U$D</p>
+                        </div>
+                    </div>
+                )}
                 <div className="stat-card">
                     <div className="stat-icon info"><FiClock /></div>
                     <div className="stat-info">
@@ -96,7 +129,21 @@ export default function ProveedorCtaCteSection({ proveedorId, refreshKey }) {
                                     <td>{formatDateLocal(p.fecha)}</td>
                                     <td>
                                         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                            <span>{p.observaciones || "Pago registrado"}</span>
+                                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                <span>{p.observaciones || "Pago registrado"}</span>
+                                                {(p.monedaPago === "USD" || p.moneda === "USD") && (
+                                                    <span style={{
+                                                        background: "#059669",
+                                                        color: "white",
+                                                        fontSize: "0.65rem",
+                                                        fontWeight: "700",
+                                                        padding: "2px 6px",
+                                                        borderRadius: "4px",
+                                                        letterSpacing: "0.03em",
+                                                        flexShrink: 0
+                                                    }}>{(p.monedaPago || "ARS") === "USD" ? "Pagó U$D" : "Deuda U$D"}</span>
+                                                )}
+                                            </div>
                                             <div style={{ position: "relative", display: "inline-block", width: "fit-content" }} className="payment-method-tooltip">
                                                 <span className="status-badge active" style={{ fontSize: "0.7rem", padding: "2px 6px", background: "#e0f2fe", color: "#0369a1" }}>
                                                     {formatMedioPago(p.medio)}
@@ -137,19 +184,76 @@ export default function ProveedorCtaCteSection({ proveedorId, refreshKey }) {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="price-cell" style={{ color: p.anulado ? "#94a3b8" : "#ef4444", textDecoration: p.anulado ? "line-through" : "none" }}>
-                                        - ${p.importe?.toLocaleString()}
+                                    <td className="price-cell" style={{ color: p.anulado ? "#94a3b8" : "#ef4444", textDecoration: p.anulado ? "line-through" : "none", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "2px" }}>
+                                        {(() => {
+                                            const mp = p.monedaPago || "ARS";
+                                            const md = p.moneda || "ARS";
+                                            const fmtARS = (v) => "$" + (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                            const fmtUSD = (v) => "U$D " + (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                                            // Primary: what the user physically paid
+                                            const primaryText = mp === "USD" ? `- ${fmtUSD(p.importeDolares)}` : `- ${fmtARS(p.importe)}`;
+
+                                            // Secondary: conversion info
+                                            let secondaryText = null;
+                                            if (mp === "USD" && md === "USD") {
+                                                secondaryText = `Equiv: ${fmtARS(p.importe)} (TC: ${p.tipoCambio})`;
+                                            } else if (mp === "ARS" && md === "USD" && p.importeDolares) {
+                                                secondaryText = `Desc: ${fmtUSD(p.importeDolares)} (TC: ${p.tipoCambio})`;
+                                            } else if (mp === "USD" && md === "ARS") {
+                                                secondaryText = `Desc: ${fmtARS(p.importe)} (TC: ${p.tipoCambio})`;
+                                            }
+
+                                            return (
+                                                <>
+                                                    <span>{primaryText}</span>
+                                                    {secondaryText && (
+                                                        <span style={{ fontSize: "0.8rem", color: "#64748b", textDecoration: "none" }}>
+                                                            {secondaryText}
+                                                        </span>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </td>
                                     <td style={{ textAlign: "right" }}>
                                         {!p.anulado && (
-                                            <button
-                                                className="btn-modern secondary"
-                                                style={{ padding: "4px 8px", color: "var(--danger)", background: "#fef2f2" }}
-                                                title="Anular Pago"
-                                                onClick={() => handleAnularPago(p.id)}
-                                            >
-                                                <FiTrash2 />
-                                            </button>
+                                            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                                                <button
+                                                    className="btn-modern secondary"
+                                                    style={{ 
+                                                        padding: "4px 10px", 
+                                                        color: "#8b5cf6", 
+                                                        background: "#f5f3ff",
+                                                        display: "inline-flex",
+                                                        alignItems: "center",
+                                                        gap: "6px",
+                                                        fontSize: "0.82rem",
+                                                        fontWeight: "600",
+                                                        border: "1px solid #ddd6fe"
+                                                    }}
+                                                    title="Descargar Orden de Pago"
+                                                    onClick={() => downloadOrdenPago(p.id)}
+                                                >
+                                                    <FiDownload /> Orden de Pago
+                                                </button>
+                                                <button
+                                                    className="btn-modern secondary"
+                                                    style={{ padding: "4px 8px", color: "var(--primary)", background: "#eff6ff" }}
+                                                    title="Editar Pago"
+                                                    onClick={() => onEditPago && onEditPago(p)}
+                                                >
+                                                    <FiEdit2 />
+                                                </button>
+                                                <button
+                                                    className="btn-modern secondary"
+                                                    style={{ padding: "4px 8px", color: "var(--danger)", background: "#fef2f2" }}
+                                                    title="Anular Pago"
+                                                    onClick={() => handleAnularPago(p.id)}
+                                                >
+                                                    <FiTrash2 />
+                                                </button>
+                                            </div>
                                         )}
                                     </td>
                                 </tr>

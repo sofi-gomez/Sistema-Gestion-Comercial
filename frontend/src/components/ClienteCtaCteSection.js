@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FiDollarSign, FiTrendingDown, FiCheckCircle, FiFileText, FiPlus } from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
+import { FiDollarSign, FiTrendingDown, FiCheckCircle, FiFileText, FiPlus, FiExternalLink, FiDownload } from "react-icons/fi";
 import CobroFormModal from "./CobroFormModal";
 import { formatDateLocal } from "../utils/dateUtils";
 import { apiFetch } from "../utils/api";
@@ -7,11 +8,42 @@ import { apiFetch } from "../utils/api";
 const API_COBROS = "/api/cobros";
 
 export default function ClienteCtaCteSection({ clienteId }) {
+    const navigate = useNavigate();
     const [saldo, setSaldo] = useState(0);
     const [movimientos, setMovimientos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalCobroOpen, setModalCobroOpen] = useState(false);
     const [sortOrder, setSortOrder] = useState("desc"); // "asc" o "desc"
+    const [cotizacionDolar, setCotizacionDolar] = useState(null);
+
+    useEffect(() => {
+        apiFetch("/api/configuracion")
+            .then(res => res.json())
+            .then(data => setCotizacionDolar(data.cotizacionDolar || null))
+            .catch(() => setCotizacionDolar(null));
+    }, []);
+
+    const downloadRecibo = async (cobroId) => {
+        try {
+            const res = await apiFetch(`${API_COBROS}/${cobroId}/recibo/pdf`);
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `recibo_cobro_${cobroId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            } else {
+                alert("Error al descargar el recibo");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error de conexión");
+        }
+    };
 
     const fetchCtaCte = useCallback(async () => {
         setLoading(true);
@@ -56,6 +88,32 @@ export default function ClienteCtaCteSection({ clienteId }) {
                     <div className="stat-info">
                         <h3>${Math.abs(saldo).toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
                         <p>{saldo >= 0 ? "Saldo Deudor" : "Saldo a Favor"}</p>
+                        {cotizacionDolar && cotizacionDolar > 0 && (
+                            <div style={{ marginTop: "6px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                                <p style={{ fontSize: "0.82rem", color: "#64748b", margin: 0, display: "flex", alignItems: "center", gap: "4px" }}>
+                                    <span style={{ fontWeight: 600, color: saldo > 0 ? "#ef4444" : "#10b981" }}>
+                                        USD {(Math.abs(saldo) / cotizacionDolar).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                </p>
+                                <span
+                                    onClick={() => navigate("/configuracion")}
+                                    title="Ir a Herramientas → Parámetros Globales"
+                                    style={{
+                                        display: "inline-flex", alignItems: "center", gap: "4px",
+                                        fontSize: "0.75rem", fontWeight: 600,
+                                        color: "#3b82f6", cursor: "pointer",
+                                        background: "#eff6ff", border: "1px solid #bfdbfe",
+                                        borderRadius: "6px", padding: "2px 8px",
+                                        width: "fit-content", transition: "all 0.15s"
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = "#dbeafe"; e.currentTarget.style.borderColor = "#93c5fd"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.borderColor = "#bfdbfe"; }}
+                                >
+                                    <FiExternalLink size={10} />
+                                    TC: ${cotizacionDolar.toLocaleString()}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
                 <div className="stat-card">
@@ -112,6 +170,7 @@ export default function ClienteCtaCteSection({ clienteId }) {
                                 <th style={{ textAlign: "right" }}>Debe (+)</th>
                                 <th style={{ textAlign: "right" }}>Haber (-)</th>
                                 <th style={{ textAlign: "right" }}>Saldo</th>
+                                <th style={{ textAlign: "center", width: "50px" }}>PDF</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -132,6 +191,28 @@ export default function ClienteCtaCteSection({ clienteId }) {
                                     </td>
                                     <td style={{ textAlign: "right", fontWeight: "700", color: m.saldoAcumulado > 0 ? "#ef4444" : "#10b981" }}>
                                         $ {m.saldoAcumulado.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </td>
+                                    <td style={{ textAlign: "center", width: "160px" }}>
+                                        {m.tipo === "HABER" && (
+                                            <button
+                                                className="btn-modern secondary"
+                                                style={{ 
+                                                    padding: "6px 12px", 
+                                                    color: "#3b82f6", 
+                                                    background: "#eff6ff",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "6px",
+                                                    fontSize: "0.85rem",
+                                                    fontWeight: "600",
+                                                    margin: "0 auto"
+                                                }}
+                                                title="Descargar Recibo"
+                                                onClick={() => downloadRecibo(m.idReferencia)}
+                                            >
+                                                <FiDownload /> Recibo de Cobro
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
