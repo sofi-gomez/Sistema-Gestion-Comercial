@@ -1,0 +1,29 @@
+# IDEs
+.idea/
+.vscode/
+
+# Build and binaries
+target/
+build/
+*.jar
+*.output
+*.log
+*.txt
+
+# Local scripts and configs
+*.bat
+cargando.html
+application-test.properties
+backend/Sistema-Gestion/src/main/resources/application-test.properties
+frontend/.env
+frontend/frontend_error.log
+
+# Database
+*.sql
+
+# Frontend build artifacts (only if you don't want to commit the production build)
+backend/Sistema-Gestion/src/main/resources/static/
+frontend/build/
+
+# Node
+node_modules/

@@ -2,7 +2,6 @@ package com.example.Sistema_Gestion.service;
 
 import com.example.Sistema_Gestion.model.Remito;
 import com.example.Sistema_Gestion.model.RemitoItem;
-import com.example.Sistema_Gestion.repository.RemitoItemRepository;
 import com.example.Sistema_Gestion.repository.RemitoRepository;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -25,14 +24,11 @@ import java.util.Optional;
 public class RemitoService {
 
     private final RemitoRepository remitoRepository;
-    private final RemitoItemRepository remitoItemRepository;
     private final ProductoService productoService;
 
     public RemitoService(RemitoRepository remitoRepository,
-            RemitoItemRepository remitoItemRepository,
             ProductoService productoService) {
         this.remitoRepository = remitoRepository;
-        this.remitoItemRepository = remitoItemRepository;
         this.productoService = productoService;
     }
 
@@ -88,9 +84,15 @@ public class RemitoService {
         if (saved.getItems() != null) {
             for (RemitoItem item : saved.getItems()) {
                 if (item.getProducto() != null && item.getCantidad() != null) {
-                    productoService.descontarStock(
+                    boolean ok = productoService.descontarStock(
                             item.getProducto().getId(),
                             item.getCantidad().intValue());
+                    if (!ok) {
+                        throw new IllegalStateException(
+                            "Stock insuficiente para el producto: '" +
+                            item.getProducto().getNombre() + "'. " +
+                            "Revisá el stock disponible antes de registrar el remito.");
+                    }
                 }
             }
         }
@@ -176,21 +178,49 @@ public class RemitoService {
     }
 
     @Transactional
-    public Remito actualizarRemito(Remito remito) {
-        Remito remitoExistente = remitoRepository.findById(remito.getId())
+    public Remito actualizarRemito(Remito remitoDraft) {
+        // 1. Obtener el remito real de la DB (gestionado por Hibernate)
+        Remito remitoPersistido = remitoRepository.findById(remitoDraft.getId())
                 .orElseThrow(() -> new RuntimeException("Remito no encontrado"));
-        remito.setNumero(remitoExistente.getNumero());
-        remitoItemRepository.deleteByRemitoId(remito.getId());
-        if (remito.getItems() != null) {
-            for (RemitoItem item : remito.getItems()) {
-                item.setRemito(remito);
-                item.setId(null);
+
+        // 2. Revertir stock de los ítems existentes antes de borrarlos
+        if (remitoPersistido.getItems() != null) {
+            for (RemitoItem item : remitoPersistido.getItems()) {
+                if (item.getProducto() != null && item.getCantidad() != null) {
+                    productoService.aumentarStock(item.getProducto().getId(), item.getCantidad().intValue());
+                }
+            }
+            // 3. Limpiar la colección (orphanRemoval=true en Remito.java se encargará del DELETE)
+            remitoPersistido.getItems().clear();
+        }
+
+        // 4. Actualizar campos básicos del objeto gestionado con los datos del borrador
+        remitoPersistido.setFecha(remitoDraft.getFecha());
+        remitoPersistido.setCliente(remitoDraft.getCliente());
+        remitoPersistido.setClienteNombre(remitoDraft.getClienteNombre());
+        remitoPersistido.setClienteDireccion(remitoDraft.getClienteDireccion());
+        remitoPersistido.setClienteCodigoPostal(remitoDraft.getClienteCodigoPostal());
+        remitoPersistido.setClienteAclaracion(remitoDraft.getClienteAclaracion());
+        remitoPersistido.setObservaciones(remitoDraft.getObservaciones());
+
+        // 5. Agregar los nuevos ítems y descontar stock
+        if (remitoDraft.getItems() != null) {
+            for (RemitoItem newItem : remitoDraft.getItems()) {
+                newItem.setId(null); // Asegurar que se traten como nuevos items
+                remitoPersistido.addItem(newItem);
+                
+                if (newItem.getProducto() != null && newItem.getCantidad() != null) {
+                    productoService.descontarStock(
+                        newItem.getProducto().getId(), 
+                        newItem.getCantidad().intValue()
+                    );
+                }
             }
         }
-        remito.preUpdate();
-        return remitoRepository.save(remito);
-    }
 
+        remitoPersistido.preUpdate();
+        return remitoRepository.save(remitoPersistido);
+    }
     public void generarPdfRemito(Remito remito, OutputStream os, byte[] logoBytes) throws Exception {
         try (PDDocument doc = new PDDocument()) {
             PDPage page = new PDPage(PDRectangle.A4);
@@ -367,8 +397,15 @@ public class RemitoService {
                 }
             }
 
-            // SECCIÓN INFERIOR - Diseño limpio
-            float bottomY = Math.max(rowY - 30, 180);
+            // SECCIÓN INFERIOR — nueva página si hay poco espacio
+            float bottomY = rowY - 30;
+            if (bottomY < 180) {
+                cs.close();
+                page = new PDPage(PDRectangle.A4);
+                doc.addPage(page);
+                cs = new PDPageContentStream(doc, page);
+                bottomY = h - margin - 40;
+            }
 
             // Observaciones (si existen)
             String observaciones = remito.getObservaciones() == null ? "" : remito.getObservaciones();
@@ -421,12 +458,6 @@ public class RemitoService {
             cs.lineTo(firmaX + 150, bottomY - 2);
             cs.stroke();
 
-            // Aclaración final centrada
-            cs.beginText();
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 8);
-            cs.newLineAtOffset(w / 2 - 120, 40);
-            cs.showText("PRECIOS EN PESOS ARGENTINOS - DOCUMENTO NO VÁLIDO COMO FACTURA");
-            cs.endText();
 
             cs.close();
             doc.save(os);

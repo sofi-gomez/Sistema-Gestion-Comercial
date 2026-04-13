@@ -33,6 +33,11 @@ public class RemitoController {
         return remitoService.listarTodos();
     }
 
+    @GetMapping("/cliente/{clienteId}")
+    public List<Remito> listarPorCliente(@PathVariable("clienteId") Long clienteId) {
+        return remitoService.listarPorCliente(clienteId);
+    }
+
     @GetMapping(params = "estado")
     public List<Remito> listarPorEstado(@RequestParam("estado") String estado) {
         try {
@@ -71,7 +76,7 @@ public class RemitoController {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             byte[] logo = null;
             try {
-                logo = Files.readAllBytes(Paths.get("src/main/resources/static/logo.png"));
+                logo = getClass().getResourceAsStream("/static/iSOTIPO.png").readAllBytes();
             } catch (Exception ex) {
                 log.warn("No se pudo cargar el logo para el PDF del remito {}", id);
             }

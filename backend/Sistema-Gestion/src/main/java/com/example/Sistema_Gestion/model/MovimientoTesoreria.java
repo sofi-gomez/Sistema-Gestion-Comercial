@@ -32,8 +32,13 @@ public class MovimientoTesoreria {
     @Column(name = "medio_pago", nullable = false)
     private String medioPago;
 
-    @Column(precision = 10, scale = 2, nullable = false)
+    @Column(precision = 14, scale = 2, nullable = false)
     private BigDecimal importe;
+
+    /** Importe referencial en USD. Solo se popula cuando el egreso es un pago a proveedor en dólares.
+     * No afecta la contabilidad en pesos — es solo informativo para identificar la moneda de origen. */
+    @Column(name = "importe_usd", precision = 10, scale = 2)
+    private BigDecimal importeUSD;
 
     private String referencia;
 
@@ -216,6 +221,14 @@ public class MovimientoTesoreria {
 
     public void setImporte(BigDecimal importe) {
         this.importe = importe;
+    }
+
+    public BigDecimal getImporteUSD() {
+        return importeUSD;
+    }
+
+    public void setImporteUSD(BigDecimal importeUSD) {
+        this.importeUSD = importeUSD;
     }
 
     public String getReferencia() {

@@ -23,4 +23,5 @@ public interface MovimientoTesoreriaRepository
                         LocalDateTime fecha);
 
         List<MovimientoTesoreria> findByReferencia(String referencia);
+        List<MovimientoTesoreria> findByReferenciaContaining(String referencia);
 }

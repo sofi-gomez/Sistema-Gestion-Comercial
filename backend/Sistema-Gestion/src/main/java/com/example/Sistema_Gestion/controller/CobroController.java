@@ -5,9 +5,13 @@ import com.example.Sistema_Gestion.model.CobroMedioPago;
 import com.example.Sistema_Gestion.service.CobroService;
 import com.example.Sistema_Gestion.service.RemitoService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.web.server.ResponseStatusException;
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +44,12 @@ public class CobroController {
      */
     @PostMapping
     public Cobro registrarCobro(@RequestBody RegistrarCobroRequest req) {
-        log.info("Registrando nuevo cobro para el cliente: {}", req.getCobro().getCliente().getNombre());
+        String clienteInfo = req.getCobro().getCliente() != null
+                ? (req.getCobro().getCliente().getNombre() != null
+                        ? req.getCobro().getCliente().getNombre()
+                        : "ID: " + req.getCobro().getCliente().getId())
+                : "desconocido";
+        log.info("Registrando nuevo cobro para el cliente: {}", clienteInfo);
         return cobroService.registrarCobro(
                 req.getCobro(),
                 req.getImportesPorRemito(),
@@ -95,6 +104,26 @@ public class CobroController {
     @GetMapping("/dashboard-summary")
     public ResponseEntity<?> getDashboardSummary() {
         return ResponseEntity.ok(cobroService.getDashboardSummary());
+    }
+
+    /** GET /api/cobros/{id}/recibo/pdf */
+    @GetMapping("/{id}/recibo/pdf")
+    public ResponseEntity<byte[]> descargarRecibo(@PathVariable("id") Long id) {
+        try {
+            byte[] logo = null;
+            try {
+                logo = getClass().getResourceAsStream("/static/iSOTIPO.png").readAllBytes();
+            } catch (Exception ignored) {}
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            cobroService.generarPdfRecibo(id, baos, logo);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "recibo_cobro_" + id + ".pdf");
+            return new ResponseEntity<>(baos.toByteArray(), headers, HttpStatus.OK);
+        } catch (Exception e) {
+            log.error("Error generando recibo PDF para cobro {}", id, e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error generando PDF");
+        }
     }
 
     // ---- Inner class para el request body ----

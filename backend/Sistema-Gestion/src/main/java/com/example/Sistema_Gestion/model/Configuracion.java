@@ -23,10 +23,20 @@ public class Configuracion {
     // Configuración de alertas
     private Integer stockMinimoGlobal = 5;
 
+    @Column(precision = 10, scale = 2)
+    private BigDecimal porcentajeIvaDefault = new BigDecimal("21.00");
+
     // Metadata
     private String version = "1.0.0";
 
     // Getters and Setters
+    public BigDecimal getPorcentajeIvaDefault() {
+        return porcentajeIvaDefault;
+    }
+
+    public void setPorcentajeIvaDefault(BigDecimal porcentajeIvaDefault) {
+        this.porcentajeIvaDefault = porcentajeIvaDefault;
+    }
     public Long getId() {
         return id;
     }

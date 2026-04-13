@@ -19,13 +19,18 @@ public interface CompraRepository extends JpaRepository<Compra, Long> {
 
     List<Compra> findByProveedorIdAndEstadoOrderByFechaDesc(Long proveedorId, String estado);
 
-    /** Total comprado a un proveedor (suma de todos sus remitos de compra) */
-    @Query("SELECT COALESCE(SUM(c.total), 0) FROM Compra c WHERE c.proveedor.id = :proveedorId")
-    BigDecimal findTotalCompradoPorProveedor(@Param("proveedorId") Long proveedorId);
+    @Query("SELECT COALESCE(SUM(c.total), 0) FROM Compra c WHERE c.proveedor.id = :proveedorId AND (c.moneda = 'ARS' OR c.moneda IS NULL)")
+    BigDecimal findTotalCompradoARS(@Param("proveedorId") Long proveedorId);
+
+    @Query("SELECT COALESCE(SUM(c.totalDolares), 0) FROM Compra c WHERE c.proveedor.id = :proveedorId AND c.moneda = 'USD'")
+    BigDecimal findTotalCompradoUSD(@Param("proveedorId") Long proveedorId);
 
     List<Compra> findByProveedorIdAndFechaBetweenOrderByFechaAsc(Long proveedorId, LocalDateTime desde,
             LocalDateTime hasta);
 
-    @Query("SELECT COALESCE(SUM(c.total), 0) FROM Compra c WHERE c.proveedor.id = :proveedorId AND c.fecha < :fecha")
-    BigDecimal totalCompradoAntesDe(@Param("proveedorId") Long proveedorId, @Param("fecha") LocalDateTime fecha);
+    @Query("SELECT COALESCE(SUM(c.total), 0) FROM Compra c WHERE c.proveedor.id = :proveedorId AND c.fecha < :fecha AND (c.moneda = 'ARS' OR c.moneda IS NULL)")
+    BigDecimal totalCompradoARSAntesDe(@Param("proveedorId") Long proveedorId, @Param("fecha") LocalDateTime fecha);
+
+    @Query("SELECT COALESCE(SUM(c.totalDolares), 0) FROM Compra c WHERE c.proveedor.id = :proveedorId AND c.fecha < :fecha AND c.moneda = 'USD'")
+    BigDecimal totalCompradoUSDAntesDe(@Param("proveedorId") Long proveedorId, @Param("fecha") LocalDateTime fecha);
 }

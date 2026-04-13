@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -54,8 +55,32 @@ public class TesoreriaController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> anularMovimiento(@PathVariable("id") Long id) {
+        log.info("Anulando movimiento de tesorería ID: {}", id);
+        if (tesoreriaService.anularMovimiento(id)) {
+            return ResponseEntity.ok().build();
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @GetMapping("/resumen")
     public ResponseEntity<?> obtenerResumen() {
         return ResponseEntity.ok(tesoreriaService.getResumenCaja());
+    }
+
+    /**
+     * AF-12: Resumen de caja para un día específico.
+     * Uso: GET /api/tesoreria/resumen-dia?fecha=2025-04-06
+     * Si no se pasa fecha, devuelve hoy.
+     */
+    @GetMapping("/resumen-dia")
+    public ResponseEntity<?> obtenerResumenDia(
+            @RequestParam(value = "fecha", required = false) String fechaStr) {
+        LocalDate fecha = (fechaStr != null && !fechaStr.isBlank())
+                ? LocalDate.parse(fechaStr)
+                : LocalDate.now();
+        return ResponseEntity.ok(tesoreriaService.getResumenDia(fecha));
     }
 }

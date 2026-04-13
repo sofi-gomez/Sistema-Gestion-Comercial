@@ -97,7 +97,7 @@ public class CobroService {
         // 2. Persistir el cobro principal
         Cobro savedCobro = cobroRepository.save(cobro);
 
-        // 3. Distribuir el cobro entre los remitos indicados
+        // Distribuir el cobro entre los remitos indicados
         for (Map.Entry<Long, BigDecimal> entry : importesPorRemito.entrySet()) {
             Long remitoId = entry.getKey();
             BigDecimal importe = entry.getValue();
@@ -125,6 +125,25 @@ public class CobroService {
             remitoService.actualizarEstadoPostCobro(remito, totalCobradoAhora);
         }
 
+        // AF-09: Calcular excedente y acumularlo como saldo a favor
+        if (!importesPorRemito.isEmpty() && cobro.getCliente() != null && cobro.getCliente().getId() != null) {
+            // Suma total de los remitos originales (deuda)
+            BigDecimal deudaTotal = importesPorRemito.keySet().stream()
+                    .map(remitoId -> remitoRepository.findById(remitoId)
+                            .map(r -> r.getTotal() != null ? r.getTotal() : BigDecimal.ZERO)
+                            .orElse(BigDecimal.ZERO))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal excedente = sumaAplicadaRemitos.subtract(deudaTotal);
+            if (excedente.compareTo(BigDecimal.ZERO) > 0) {
+                clienteRepository.findById(cobro.getCliente().getId()).ifPresent(cliente -> {
+                    BigDecimal actual = cliente.getSaldoAFavor();
+                    cliente.setSaldoAFavor(actual.add(excedente));
+                    clienteRepository.save(cliente);
+                });
+            }
+        }
+
         // 4. Registrar los medios de pago y movimientos de tesorería
         if (mediosPago != null) {
             for (CobroMedioPago medio : mediosPago) {
@@ -137,7 +156,13 @@ public class CobroService {
                 mov.setMedioPago(medio.getMedio()); // El modelo CobroMedioPago usa String para medio
                 mov.setImporte(medio.getImporte());
                 mov.setFecha(savedCobro.getFecha().atStartOfDay());
-                mov.setDescripcion("Cobro de Cliente: " + nombreCliente);
+                
+                // Simplificar descripción: Solo mostrar observaciones manuales
+                String desc = (medio.getCobro().getObservaciones() != null && !medio.getCobro().getObservaciones().trim().isEmpty())
+                              ? medio.getCobro().getObservaciones().trim()
+                              : "Cobro de Cliente";
+                mov.setDescripcion(desc);
+                
                 mov.setReferencia("Cobro #" + savedCobro.getId());
                 mov.setEntidad(nombreCliente);
 
@@ -219,11 +244,42 @@ public class CobroService {
     @Transactional
     public boolean anularCobro(Long id) {
         return cobroRepository.findById(id).map(cobro -> {
+            if (Boolean.TRUE.equals(cobro.getAnulado())) {
+                return true; // Ya anulado
+            }
+
             cobro.setAnulado(true);
             cobroRepository.save(cobro);
-            // Al anular un cobro, los remitos que estaban COBRADO pueden necesitar
-            // volver a VALORIZADO — se delega esa responsabilidad a un proceso manual
-            // para no generar efectos en cascada inesperados
+
+            // 1. Revertir impacto en Saldo a Favor del cliente (AF-09)
+            if (cobro.getCliente() != null && cobro.getCliente().getId() != null) {
+                // Recalcular el excedente original que se acreditó
+                BigDecimal sumaAplicadaRemitos = cobro.getTotalCobrado();
+                BigDecimal deudaTotalCubierta = cobro.getRemitos().stream()
+                        .map(cr -> cr.getRemito().getTotal() != null ? cr.getRemito().getTotal() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                
+                BigDecimal excedenteOriginal = sumaAplicadaRemitos.subtract(deudaTotalCubierta);
+                if (excedenteOriginal.compareTo(BigDecimal.ZERO) > 0) {
+                    clienteRepository.findById(cobro.getCliente().getId()).ifPresent(cliente -> {
+                        BigDecimal actual = cliente.getSaldoAFavor();
+                        cliente.setSaldoAFavor(actual.subtract(excedenteOriginal));
+                        clienteRepository.save(cliente);
+                    });
+                }
+            }
+
+            // 2. Anular los movimientos de tesorería asociados a este cobro
+            tesoreriaService.anularPorReferencia("Cobro #" + cobro.getId());
+
+            // 3. Revertir estado de remitos asociados
+            for (CobroRemito cr : cobro.getRemitos()) {
+                Remito remito = cr.getRemito();
+                // Recalcular total cobrado real sobre este remito SIN este cobro anulado
+                BigDecimal totalCobrado = cobroRemitoRepository.totalCobradoPorRemito(remito.getId());
+                remitoService.actualizarEstadoPostCobro(remito, totalCobrado);
+            }
+
             return true;
         }).orElse(false);
     }
@@ -273,4 +329,252 @@ public class CobroService {
 
         return summary;
     }
+
+    // =================== PDF: RECIBO DE COBRO ===================
+
+    public void generarPdfRecibo(Long cobroId, java.io.OutputStream os, byte[] logoBytes) throws Exception {
+        Cobro cobro = cobroRepository.findById(cobroId)
+                .orElseThrow(() -> new RuntimeException("Cobro no encontrado: " + cobroId));
+
+        try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument()) {
+            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
+            doc.addPage(page);
+            org.apache.pdfbox.pdmodel.PDPageContentStream cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page);
+
+            float w = page.getMediaBox().getWidth();
+            float h = page.getMediaBox().getHeight();
+            float margin = 40f;
+            float y = h - margin;
+
+            // ----- LOGO -----
+            if (logoBytes != null) {
+                try {
+                    org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject logo =
+                            org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject.createFromByteArray(doc, logoBytes, "logo");
+                    cs.drawImage(logo, margin, y - 60, 60, 60);
+                } catch (Exception ignored) {}
+            }
+
+            // ----- ENCABEZADO -----
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 22);
+            cs.newLineAtOffset(w / 2f - 70, y - 28);
+            cs.showText("RECIBO DE COBRO");
+            cs.endText();
+
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 13);
+            cs.newLineAtOffset(w / 2f - 30, y - 50);
+            cs.showText("RC-" + String.format("%05d", cobro.getId()));
+            cs.endText();
+
+            String fecha = cobro.getFecha() != null
+                    ? cobro.getFecha().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                    : java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 10);
+            cs.newLineAtOffset(w - margin - 100, y - 28);
+            cs.showText("Fecha: " + fecha);
+            cs.endText();
+
+            // Línea separadora
+            y -= 75;
+            cs.setLineWidth(1f);
+            cs.moveTo(margin, y); cs.lineTo(w - margin, y); cs.stroke();
+
+            // ----- EMPRESA -----
+            y -= 22;
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 10);
+            cs.newLineAtOffset(margin, y);
+            cs.showText("Leonel Gomez – Agro-Ferretería");
+            cs.endText();
+
+            // ----- CLIENTE -----
+            y -= 25;
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 11);
+            cs.newLineAtOffset(margin, y);
+            cs.showText("DATOS DEL CLIENTE");
+            cs.endText();
+
+            y -= 18;
+            String clienteNombre = cobro.getCliente() != null ? cobro.getCliente().getNombre() : "—";
+            String clienteCuit = (cobro.getCliente() != null && cobro.getCliente().getDocumento() != null)
+                    ? cobro.getCliente().getDocumento() : "—";
+            drawLabelValue(cs, margin, y, "Cliente:", clienteNombre);
+            y -= 16;
+            drawLabelValue(cs, margin, y, "CUIT:", clienteCuit);
+
+            // Línea separadora
+            y -= 18;
+            cs.setLineWidth(0.5f);
+            cs.moveTo(margin, y); cs.lineTo(w - margin, y); cs.stroke();
+
+            // ----- DETALLE DE VALORES RECIBIDOS -----
+            y -= 20;
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 11);
+            cs.newLineAtOffset(margin, y);
+            cs.showText("VALORES RECIBIDOS");
+            cs.endText();
+
+            // Cabecera tabla
+            y -= 20;
+            cs.setNonStrokingColor(new java.awt.Color(230, 230, 230));
+            cs.addRect(margin, y - 18, w - 2 * margin, 18); cs.fill();
+            cs.setNonStrokingColor(java.awt.Color.BLACK);
+            cs.setLineWidth(0.4f);
+            cs.addRect(margin, y - 18, w - 2 * margin, 18); cs.stroke();
+
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
+            cs.newLineAtOffset(margin + 5, y - 13); cs.showText("Medio"); cs.endText();
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
+            cs.newLineAtOffset(margin + 120, y - 13); cs.showText("Detalle"); cs.endText();
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
+            cs.newLineAtOffset(w - margin - 80, y - 13); cs.showText("Importe"); cs.endText();
+
+            y -= 18;
+            if (cobro.getMediosPago() != null) {
+                for (com.example.Sistema_Gestion.model.CobroMedioPago mp : cobro.getMediosPago()) {
+                    cs.setLineWidth(0.2f);
+                    cs.addRect(margin, y - 16, w - 2 * margin, 16); cs.stroke();
+
+                    String medioLabel = mp.getMedio() != null ? mp.getMedio().replace("_", " ") : "EFECTIVO";
+                    String detalleLabel = "";
+                    if (mp.getMedio() != null && mp.getMedio().contains("CHEQUE")) {
+                        detalleLabel = "Banco: " + safe(mp.getBanco())
+                                + " | N°: " + safe(mp.getNumeroCheque())
+                                + " | Vto: " + (mp.getFechaVencimiento() != null
+                                        ? mp.getFechaVencimiento().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy")) : "—");
+                    } else if ("TRANSFERENCIA".equals(mp.getMedio())) {
+                        detalleLabel = "Transferencia bancaria";
+                    }
+
+                    cs.beginText();
+                    cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
+                    cs.newLineAtOffset(margin + 5, y - 11); cs.showText(medioLabel); cs.endText();
+
+                    cs.beginText();
+                    cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 8);
+                    cs.newLineAtOffset(margin + 120, y - 11); cs.showText(detalleLabel); cs.endText();
+
+                    String importeStr = "$ " + (mp.getImporte() != null
+                            ? mp.getImporte().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() : "0.00");
+                    cs.beginText();
+                    cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
+                    cs.newLineAtOffset(w - margin - 78, y - 11); cs.showText(importeStr); cs.endText();
+
+                    y -= 18;
+                }
+            }
+
+            // Total cobrado
+            y -= 8;
+            cs.setLineWidth(1f);
+            cs.moveTo(margin, y); cs.lineTo(w - margin, y); cs.stroke();
+            y -= 18;
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 12);
+            cs.newLineAtOffset(w - margin - 200, y);
+            String totalStr = "TOTAL RECIBIDO: $ " + (cobro.getTotalCobrado() != null
+                    ? cobro.getTotalCobrado().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() : "0.00");
+            cs.showText(totalStr);
+            cs.endText();
+
+            // Línea separadora
+            y -= 18;
+            cs.setLineWidth(0.5f);
+            cs.moveTo(margin, y); cs.lineTo(w - margin, y); cs.stroke();
+
+            // ----- IMPUTACIÓN A REMITOS -----
+            y -= 20;
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 11);
+            cs.newLineAtOffset(margin, y);
+            cs.showText("APLICADO A / CANCELACIÓN DE DEUDA");
+            cs.endText();
+
+            y -= 18;
+            if (cobro.getRemitos() != null && !cobro.getRemitos().isEmpty()) {
+                for (com.example.Sistema_Gestion.model.CobroRemito cr : cobro.getRemitos()) {
+                    if (cr.getRemito() == null) continue;
+                    cs.setLineWidth(0.2f);
+                    cs.addRect(margin, y - 14, w - 2 * margin, 14); cs.stroke();
+                    cs.beginText();
+                    cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
+                    cs.newLineAtOffset(margin + 5, y - 10);
+                    cs.showText("Remito N° " + cr.getRemito().getNumero()); cs.endText();
+                    String montoImput = "$ " + (cr.getImporte() != null
+                            ? cr.getImporte().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() : "—");
+                    cs.beginText();
+                    cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
+                    cs.newLineAtOffset(w - margin - 78, y - 10); cs.showText(montoImput); cs.endText();
+                    y -= 16;
+                }
+            } else {
+                cs.beginText();
+                cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
+                cs.newLineAtOffset(margin + 5, y - 10);
+                cs.showText("Pago a cuenta sin imputación específica"); cs.endText();
+                y -= 16;
+            }
+
+            // Observaciones
+            if (cobro.getObservaciones() != null && !cobro.getObservaciones().isBlank()) {
+                y -= 10;
+                cs.beginText();
+                cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
+                cs.newLineAtOffset(margin, y); cs.showText("Observaciones: "); cs.endText();
+                y -= 13;
+                cs.beginText();
+                cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
+                cs.newLineAtOffset(margin + 5, y);
+                cs.showText(safe(cobro.getObservaciones())); cs.endText();
+                y -= 16;
+            }
+
+            // ----- FIRMA -----
+            y -= 20;
+            cs.setLineWidth(0.8f);
+            cs.moveTo(margin + 20, y - 2); cs.lineTo(margin + 170, y - 2); cs.stroke();
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
+            cs.newLineAtOffset(margin + 55, y - 14); cs.showText("Firma del cliente"); cs.endText();
+
+            cs.moveTo(w - margin - 150, y - 2); cs.lineTo(w - margin - 10, y - 2); cs.stroke();
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
+            cs.newLineAtOffset(w - margin - 120, y - 14); cs.showText("Firma / Sello empresa"); cs.endText();
+
+            // Pie
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 7);
+            cs.newLineAtOffset(w / 2f - 130, 30);
+            cs.showText("DOCUMENTO NO VÁLIDO COMO FACTURA – Los cheques están sujetos a acreditación bancaria.");
+            cs.endText();
+
+            cs.close();
+            doc.save(os);
+        }
+    }
+
+    private void drawLabelValue(org.apache.pdfbox.pdmodel.PDPageContentStream cs, float x, float y,
+            String label, String value) throws Exception {
+        cs.beginText();
+        cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 10);
+        cs.newLineAtOffset(x, y); cs.showText(label); cs.endText();
+        cs.beginText();
+        cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 10);
+        cs.newLineAtOffset(x + 60, y); cs.showText(safe(value)); cs.endText();
+    }
+
+    private String safe(String s) {
+        if (s == null) return "";
+        return s.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
+    }
 }
+
