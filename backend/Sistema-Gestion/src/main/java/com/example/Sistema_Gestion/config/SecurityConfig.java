@@ -39,7 +39,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .anyRequest().authenticated());
+                        .requestMatchers("/api/**").authenticated() // Proteger solo la API
+                        .anyRequest().permitAll()); // Permitir acceso libre al frontend (React)
 
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

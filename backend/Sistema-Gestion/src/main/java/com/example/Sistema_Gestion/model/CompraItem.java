@@ -28,8 +28,14 @@ public class CompraItem {
     @Column(precision = 14, scale = 2, nullable = false)
     private BigDecimal precioUnitario;
 
+    @Column(precision = 6, scale = 2)
+    private BigDecimal descuento = BigDecimal.ZERO;
+
     @Column(precision = 14, scale = 2, nullable = false)
     private BigDecimal subtotal;
+
+    @Column(precision = 14, scale = 2)
+    private BigDecimal precioUnitarioUSD = BigDecimal.ZERO;
 
     // =================== GETTERS Y SETTERS ===================
 
@@ -79,5 +85,21 @@ public class CompraItem {
 
     public void setSubtotal(BigDecimal subtotal) {
         this.subtotal = subtotal;
+    }
+
+    public BigDecimal getDescuento() {
+        return descuento;
+    }
+
+    public void setDescuento(BigDecimal descuento) {
+        this.descuento = descuento;
+    }
+
+    public BigDecimal getPrecioUnitarioUSD() {
+        return precioUnitarioUSD;
+    }
+
+    public void setPrecioUnitarioUSD(BigDecimal precioUnitarioUSD) {
+        this.precioUnitarioUSD = precioUnitarioUSD;
     }
 }

@@ -30,7 +30,19 @@ public class PagoProveedor {
     private LocalDate fecha;
 
     @Column(precision = 14, scale = 2, nullable = false)
-    private BigDecimal importe;
+    private BigDecimal importe; // El equivalente en ARS que entra a Tesorería
+
+    @Column(length = 3)
+    private String moneda = "ARS"; // Moneda de la deuda que cubre (determina qué bucket de deuda se reduce)
+
+    @Column(name = "moneda_pago", length = 3)
+    private String monedaPago = "ARS"; // Moneda física del pago (en qué moneda pagó realmente)
+
+    @Column(precision = 14, scale = 4)
+    private BigDecimal tipoCambio = BigDecimal.ONE;
+
+    @Column(precision = 14, scale = 2)
+    private BigDecimal importeDolares = BigDecimal.ZERO; // Lo que realmente se descuenta de la deuda en USD
 
     /**
      * Medio de pago: EFECTIVO, CHEQUE, TRANSFERENCIA, CUENTA_CORRIENTE
@@ -179,5 +191,37 @@ public class PagoProveedor {
 
     public void setCompras(List<PagoProveedorCompra> compras) {
         this.compras = compras;
+    }
+
+    public String getMoneda() {
+        return moneda;
+    }
+
+    public void setMoneda(String moneda) {
+        this.moneda = moneda;
+    }
+
+    public String getMonedaPago() {
+        return monedaPago;
+    }
+
+    public void setMonedaPago(String monedaPago) {
+        this.monedaPago = monedaPago;
+    }
+
+    public BigDecimal getTipoCambio() {
+        return tipoCambio;
+    }
+
+    public void setTipoCambio(BigDecimal tipoCambio) {
+        this.tipoCambio = tipoCambio;
+    }
+
+    public BigDecimal getImporteDolares() {
+        return importeDolares;
+    }
+
+    public void setImporteDolares(BigDecimal importeDolares) {
+        this.importeDolares = importeDolares;
     }
 }

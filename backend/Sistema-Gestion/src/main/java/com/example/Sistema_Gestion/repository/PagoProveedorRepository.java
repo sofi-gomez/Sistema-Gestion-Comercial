@@ -14,13 +14,18 @@ public interface PagoProveedorRepository extends JpaRepository<PagoProveedor, Lo
 
     List<PagoProveedor> findByProveedorIdOrderByFechaDesc(Long proveedorId);
 
-    /** Total pagado a un proveedor (no anulados) */
-    @Query("SELECT COALESCE(SUM(p.importe), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false")
-    BigDecimal totalPagadoPorProveedor(@Param("proveedorId") Long proveedorId);
+    @Query("SELECT COALESCE(SUM(p.importe), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND p.moneda = 'ARS'")
+    BigDecimal totalPagadoARSPorProveedor(@Param("proveedorId") Long proveedorId);
+
+    @Query("SELECT COALESCE(SUM(p.importeDolares), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND p.moneda = 'USD'")
+    BigDecimal totalPagadoUSDPorProveedor(@Param("proveedorId") Long proveedorId);
 
     List<PagoProveedor> findByProveedorIdAndFechaBetweenOrderByFechaAsc(Long proveedorId, LocalDate desde,
             LocalDate hasta);
 
-    @Query("SELECT COALESCE(SUM(p.importe), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND p.fecha < :fecha")
-    BigDecimal totalPagadoAntesDe(@Param("proveedorId") Long proveedorId, @Param("fecha") LocalDate fecha);
+    @Query("SELECT COALESCE(SUM(p.importe), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND p.fecha < :fecha AND p.moneda = 'ARS'")
+    BigDecimal totalPagadoARSAntesDe(@Param("proveedorId") Long proveedorId, @Param("fecha") LocalDate fecha);
+
+    @Query("SELECT COALESCE(SUM(p.importeDolares), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND p.fecha < :fecha AND p.moneda = 'USD'")
+    BigDecimal totalPagadoUSDAntesDe(@Param("proveedorId") Long proveedorId, @Param("fecha") LocalDate fecha);
 }

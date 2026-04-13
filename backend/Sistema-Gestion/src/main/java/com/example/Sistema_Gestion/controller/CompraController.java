@@ -25,6 +25,12 @@ public class CompraController {
         return compraService.registrarCompra(compra);
     }
 
+    @PutMapping("/{id}")
+    public Compra actualizar(@PathVariable("id") Long id, @RequestBody Compra compra) {
+        log.info("Actualizando compra ID: {}", id);
+        return compraService.actualizarCompra(id, compra);
+    }
+
     @GetMapping("/proveedor/{proveedorId}")
     public java.util.List<Compra> listarPorProveedor(@PathVariable("proveedorId") Long proveedorId) {
         log.info("Listando compras del proveedor ID: {}", proveedorId);

@@ -1,6 +1,7 @@
 package com.example.Sistema_Gestion.model;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -23,6 +24,10 @@ public class Cliente {
 
     @Column(columnDefinition = "TEXT")
     private String notas;
+
+    /** Saldo a favor acumulado. Se incrementa cuando el cliente paga de más. */
+    @Column(name = "saldo_a_favor", precision = 14, scale = 2)
+    private BigDecimal saldoAFavor = BigDecimal.ZERO;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -100,6 +105,14 @@ public class Cliente {
 
     public void setNotas(String notas) {
         this.notas = notas;
+    }
+
+    public java.math.BigDecimal getSaldoAFavor() {
+        return saldoAFavor != null ? saldoAFavor : java.math.BigDecimal.ZERO;
+    }
+
+    public void setSaldoAFavor(java.math.BigDecimal saldoAFavor) {
+        this.saldoAFavor = saldoAFavor;
     }
 
     public LocalDateTime getCreatedAt() {

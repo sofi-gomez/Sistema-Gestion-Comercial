@@ -69,12 +69,20 @@ public class ProveedorService {
     public Map<String, Object> getDashboardSummary() {
         List<Proveedor> todos = proveedorRepository.findAll();
 
-        BigDecimal deudaTotal = todos.stream()
-                .map(p -> compraRepository.findTotalCompradoPorProveedor(p.getId()))
+        BigDecimal deudaTotalARS = todos.stream()
+                .map(p -> compraRepository.findTotalCompradoARS(p.getId())
+                        .subtract(pagoProveedorRepository.totalPagadoARSPorProveedor(p.getId())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal deudaTotalUSD = todos.stream()
+                .map(p -> compraRepository.findTotalCompradoUSD(p.getId())
+                        .subtract(pagoProveedorRepository.totalPagadoUSDPorProveedor(p.getId())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Map<String, Object> summary = new HashMap<>();
-        summary.put("cuentasPorPagar", deudaTotal);
+        summary.put("cuentasPorPagar", deudaTotalARS); // Mantenemos retrocompatibilidad parcial o renombramos
+        summary.put("cuentasPorPagarARS", deudaTotalARS);
+        summary.put("cuentasPorPagarUSD", deudaTotalUSD);
         summary.put("totalProveedores", todos.size());
 
         return summary;
@@ -86,18 +94,23 @@ public class ProveedorService {
         LocalDateTime desdeDT = desde.atStartOfDay();
         LocalDateTime hastaDT = hasta.atTime(LocalTime.MAX);
 
-        // 1. Saldo Inicial
-        BigDecimal comprasPre = compraRepository.totalCompradoAntesDe(proveedorId, desdeDT);
-        BigDecimal pagosPre = pagoProveedorRepository.totalPagadoAntesDe(proveedorId, desde);
-        BigDecimal saldoInicial = comprasPre.subtract(pagosPre);
+        // 1. Saldos Iniciales
+        BigDecimal comprasPreARS = compraRepository.totalCompradoARSAntesDe(proveedorId, desdeDT);
+        BigDecimal pagosPreARS = pagoProveedorRepository.totalPagadoARSAntesDe(proveedorId, desde);
+        BigDecimal saldoInicialARS = comprasPreARS.subtract(pagosPreARS);
+
+        BigDecimal comprasPreUSD = compraRepository.totalCompradoUSDAntesDe(proveedorId, desdeDT);
+        BigDecimal pagosPreUSD = pagoProveedorRepository.totalPagadoUSDAntesDe(proveedorId, desde);
+        BigDecimal saldoInicialUSD = comprasPreUSD.subtract(pagosPreUSD);
 
         // 2. Movimientos del periodo
         List<Compra> compras = compraRepository.findByProveedorIdAndFechaBetweenOrderByFechaAsc(proveedorId, desdeDT,
                 hastaDT);
         List<PagoProveedor> pagos = pagoProveedorRepository.findByProveedorIdAndFechaBetweenOrderByFechaAsc(proveedorId,
-                desde, hasta).stream().filter(p -> !p.getAnulado()).toList();
+                desde, hasta).stream().filter(p -> !Boolean.TRUE.equals(p.getAnulado())).toList();
 
-        BigDecimal currentSaldo = saldoInicial;
+        BigDecimal currentSaldoARS = saldoInicialARS;
+        BigDecimal currentSaldoUSD = saldoInicialUSD;
         List<Map<String, Object>> movs = new ArrayList<>();
 
         // Unificar y ordenar por fecha para calcular saldo acumulado
@@ -110,14 +123,18 @@ public class ProveedorService {
                     return f1.compareTo(f2);
                 }).toList();
 
-        BigDecimal totalCompras = BigDecimal.ZERO;
-        BigDecimal totalPagos = BigDecimal.ZERO;
+        BigDecimal totalComprasARS = BigDecimal.ZERO;
+        BigDecimal totalPagosARS = BigDecimal.ZERO;
+        BigDecimal totalComprasUSD = BigDecimal.ZERO;
+        BigDecimal totalPagosUSD = BigDecimal.ZERO;
 
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyyy");
         for (Object item : unificado) {
             if (item instanceof Compra c) {
                 String remitoProv = (c.getAnotaciones() != null && !c.getAnotaciones().isEmpty()) ? c.getAnotaciones()
                         : "RM-" + c.getNumero();
+                
+                boolean isUSD = "USD".equals(c.getMoneda());
 
                 // 1. Fila de Encabezado de la Compra/Remito
                 Map<String, Object> header = new HashMap<>();
@@ -130,7 +147,8 @@ public class ProveedorService {
                 header.put("tipoOriginal", "COMPRA");
                 header.put("debe", BigDecimal.ZERO);
                 header.put("haber", BigDecimal.ZERO);
-                header.put("saldo", currentSaldo);
+                header.put("moneda", c.getMoneda() != null ? c.getMoneda() : "ARS");
+                header.put("saldo", isUSD ? currentSaldoUSD : currentSaldoARS);
                 movs.add(header);
 
                 if (c.getItems() != null && !c.getItems().isEmpty()) {
@@ -141,15 +159,52 @@ public class ProveedorService {
                         m.put("numeroDocumento", "");
                         m.put("descripcion", it.getProducto().getNombre());
                         m.put("cantidad", it.getCantidad());
-                        m.put("precioUnitario", it.getPrecioUnitario());
-                        m.put("debe", it.getSubtotal());
+                        m.put("precioUnitario", isUSD ? it.getPrecioUnitarioUSD() : it.getPrecioUnitario());
+                        m.put("debe", isUSD ? (it.getPrecioUnitarioUSD() != null ? it.getPrecioUnitarioUSD().multiply(new BigDecimal(it.getCantidad())) : BigDecimal.ZERO) : it.getSubtotal());
                         m.put("haber", BigDecimal.ZERO);
+                        m.put("moneda", c.getMoneda() != null ? c.getMoneda() : "ARS");
                         m.put("isHeader", false);
 
-                        currentSaldo = currentSaldo.add(it.getSubtotal());
-                        totalCompras = totalCompras.add(it.getSubtotal());
-                        m.put("saldo", currentSaldo);
+                        if(isUSD) {
+                            currentSaldoUSD = currentSaldoUSD.add((BigDecimal) m.get("debe"));
+                            totalComprasUSD = totalComprasUSD.add((BigDecimal) m.get("debe"));
+                        } else {
+                            currentSaldoARS = currentSaldoARS.add((BigDecimal) m.get("debe"));
+                            totalComprasARS = totalComprasARS.add((BigDecimal) m.get("debe"));
+                        }
+                        
+                        m.put("saldo", isUSD ? currentSaldoUSD : currentSaldoARS);
                         movs.add(m);
+                    }
+                    // Si tiene IVA
+                    if (Boolean.TRUE.equals(c.getIncluyeIva()) && c.getIvaImporte() != null && c.getIvaImporte().compareTo(BigDecimal.ZERO) > 0) {
+                        Map<String, Object> mIva = new HashMap<>();
+                        mIva.put("fecha", "");
+                        mIva.put("tipo", "IVA");
+                        mIva.put("numeroDocumento", "");
+                        mIva.put("descripcion", "IVA (" + c.getPorcentajeIva() + "%)");
+                        
+                        BigDecimal valorIva = c.getIvaImporte();
+                        if(isUSD && c.getTipoCambio() != null && c.getTipoCambio().compareTo(BigDecimal.ZERO) > 0) {
+                             // Si esta en usd, el iva guardado suele ser en pesos, lo convertimos de vuelta para mostrar u omitimos, aca lo intentamos mostrar
+                             valorIva = c.getIvaImporte().divide(c.getTipoCambio(), 2, java.math.RoundingMode.HALF_UP);
+                        }
+
+                        mIva.put("debe", valorIva);
+                        mIva.put("haber", BigDecimal.ZERO);
+                        mIva.put("moneda", c.getMoneda() != null ? c.getMoneda() : "ARS");
+                        mIva.put("isHeader", false);
+
+                        if(isUSD) {
+                            currentSaldoUSD = currentSaldoUSD.add(valorIva);
+                            totalComprasUSD = totalComprasUSD.add(valorIva);
+                        } else {
+                            currentSaldoARS = currentSaldoARS.add(valorIva);
+                            totalComprasARS = totalComprasARS.add(valorIva);
+                        }
+                        
+                        mIva.put("saldo", isUSD ? currentSaldoUSD : currentSaldoARS);
+                        movs.add(mIva);
                     }
                 } else {
                     Map<String, Object> m = new HashMap<>();
@@ -157,17 +212,24 @@ public class ProveedorService {
                     m.put("tipo", "ITEM");
                     m.put("numeroDocumento", "");
                     m.put("descripcion", "Compra de mercadería");
-                    m.put("debe", c.getTotal());
+                    m.put("debe", isUSD ? c.getTotalDolares() : c.getTotal());
                     m.put("haber", BigDecimal.ZERO);
+                    m.put("moneda", c.getMoneda() != null ? c.getMoneda() : "ARS");
                     m.put("isHeader", false);
 
-                    currentSaldo = currentSaldo.add(c.getTotal());
-                    totalCompras = totalCompras.add(c.getTotal());
-                    m.put("saldo", currentSaldo);
+                    if(isUSD) {
+                        currentSaldoUSD = currentSaldoUSD.add((BigDecimal) m.get("debe"));
+                        totalComprasUSD = totalComprasUSD.add((BigDecimal) m.get("debe"));
+                    } else {
+                        currentSaldoARS = currentSaldoARS.add((BigDecimal) m.get("debe"));
+                        totalComprasARS = totalComprasARS.add((BigDecimal) m.get("debe"));
+                    }
+                    m.put("saldo", isUSD ? currentSaldoUSD : currentSaldoARS);
                     movs.add(m);
                 }
             } else {
                 PagoProveedor p = (PagoProveedor) item;
+                boolean isUSD = "USD".equals(p.getMoneda());
                 Map<String, Object> m = new HashMap<>();
                 m.put("fecha", p.getFecha().format(dtf));
                 m.put("tipo", "PAGO");
@@ -175,19 +237,27 @@ public class ProveedorService {
                 m.put("descripcion", "COMPROBANTE DE PAGO N° " + p.getId()
                         + (p.getObservaciones() != null ? " (" + p.getObservaciones() + ")" : ""));
                 m.put("debe", BigDecimal.ZERO);
-                m.put("haber", p.getImporte());
+                m.put("haber", isUSD ? p.getImporteDolares() : p.getImporte());
                 m.put("isHeader", true); // Pagos como nivel principal
                 m.put("idOriginal", p.getId());
                 m.put("tipoOriginal", "PAGO");
+                m.put("moneda", p.getMoneda() != null ? p.getMoneda() : "ARS");
 
                 m.put("medio", p.getMedio());
+                m.put("monedaPago", p.getMonedaPago() != null ? p.getMonedaPago() : "ARS");
                 m.put("banco", p.getBanco());
                 m.put("numeroCheque", p.getNumeroCheque());
                 m.put("fechaVenc", p.getFechaVenc() != null ? p.getFechaVenc().format(dtf) : null);
 
-                currentSaldo = currentSaldo.subtract(p.getImporte());
-                totalPagos = totalPagos.add(p.getImporte());
-                m.put("saldo", currentSaldo);
+                if(isUSD) {
+                    currentSaldoUSD = currentSaldoUSD.subtract((BigDecimal) m.get("haber"));
+                    totalPagosUSD = totalPagosUSD.add((BigDecimal) m.get("haber"));
+                } else {
+                    currentSaldoARS = currentSaldoARS.subtract((BigDecimal) m.get("haber"));
+                    totalPagosARS = totalPagosARS.add((BigDecimal) m.get("haber"));
+                }
+
+                m.put("saldo", isUSD ? currentSaldoUSD : currentSaldoARS);
                 movs.add(m);
             }
         }
@@ -196,11 +266,17 @@ public class ProveedorService {
         res.put("proveedor", Map.of("id", prov.getId(), "nombre", prov.getNombre(), "cuit",
                 prov.getCuit() != null ? prov.getCuit() : ""));
         res.put("periodo", Map.of("desde", desde.toString(), "hasta", hasta.toString()));
-        res.put("saldoInicial", saldoInicial);
+        res.put("saldoInicial", saldoInicialARS); // default ARS for compat
+        res.put("saldoInicialARS", saldoInicialARS);
+        res.put("saldoInicialUSD", saldoInicialUSD);
         res.put("movimientos", movs);
-        res.put("totalCompras", totalCompras);
-        res.put("totalPagos", totalPagos);
-        res.put("saldoFinal", currentSaldo);
+        res.put("totalComprasARS", totalComprasARS);
+        res.put("totalComprasUSD", totalComprasUSD);
+        res.put("totalPagosARS", totalPagosARS);
+        res.put("totalPagosUSD", totalPagosUSD);
+        res.put("saldoFinal", currentSaldoARS); // default ARS for compat
+        res.put("saldoFinalARS", currentSaldoARS);
+        res.put("saldoFinalUSD", currentSaldoUSD);
 
         return res;
     }
@@ -263,10 +339,10 @@ public class ProveedorService {
             cs.beginText();
             cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
             cs.newLineAtOffset(margin + 10, y - 15);
-            cs.showText("PROVEEDOR: " + prov.get("nombre"));
+            cs.showText(sanitizeForPdf("PROVEEDOR: " + prov.get("nombre")));
             cs.newLineAtOffset(0, -15);
             cs.setFont(PDType1Font.HELVETICA, 10);
-            cs.showText("CUIT: " + prov.get("cuit"));
+            cs.showText(sanitizeForPdf("CUIT: " + prov.get("cuit")));
             cs.endText();
 
             y -= 85;
@@ -333,9 +409,18 @@ public class ProveedorService {
                 }
 
                 if (isHeader) {
+                    
+                    String fullDesc = sanitizeForPdf((String) m.get("descripcion"));
+                    if ("USD".equals(m.get("moneda"))) {
+                        fullDesc = "[U$D] " + fullDesc;
+                    }
+                    List<String> descLines = splitText(fullDesc, PDType1Font.HELVETICA_BOLD, 8, 280); 
+                    int extraLines = Math.max(0, descLines.size() - 1);
+                    float boxExtraHeight = extraLines * 12;
+
                     // Header de Bloque (Remito o Pago)
                     cs.setNonStrokingColor(new java.awt.Color(248, 249, 250));
-                    cs.addRect(margin, y - 20, w - 2 * margin, 20);
+                    cs.addRect(margin, y - 20 - boxExtraHeight, w - 2 * margin, 20 + boxExtraHeight);
                     cs.fill();
                     cs.setNonStrokingColor(java.awt.Color.BLACK);
 
@@ -343,50 +428,63 @@ public class ProveedorService {
                     cs.setFont(PDType1Font.HELVETICA_BOLD, 8);
                     cs.newLineAtOffset(margin + 5, y - 13);
 
-                    String headerDesc = m.get("fecha") + "  -  " + m.get("descripcion");
-                    if ("PAGO".equals(m.get("tipo")) && m.get("medio") != null) {
-                        String medioStr = ((String) m.get("medio")).replace("_", " ");
-                        headerDesc += " [" + medioStr + "]";
-                    }
-                    cs.showText(headerDesc);
+                    String primeraLineaText = m.get("fecha") + "  -  " + (descLines.isEmpty() ? "" : descLines.get(0));
+                    cs.showText(primeraLineaText);
 
                     if ("PAGO".equals(m.get("tipo"))) {
                         cs.newLineAtOffset(365, 0);
                         cs.showText(String.format("%.2f", ((BigDecimal) m.get("haber")).doubleValue()));
                         cs.newLineAtOffset(60, 0);
                         cs.showText(String.format("%.2f", ((BigDecimal) m.get("saldo")).doubleValue()));
+                        cs.newLineAtOffset(-425, 0); // Vuelve a la izquierda
                     } else if ("COMPRA".equals(m.get("tipo"))) {
                         cs.newLineAtOffset(425, 0);
                         cs.showText(String.format("%.2f", ((BigDecimal) m.get("saldo")).doubleValue()));
+                        cs.newLineAtOffset(-425, 0); // Vuelve a la izquierda
+                    }
+
+                    // Imprimir lineas restantes de la descripción
+                    for (int j = 1; j < descLines.size(); j++) {
+                        cs.newLineAtOffset(0, -12);
+                        // Alinear con el inicio del texto original, después de la fecha (aprox 60 pt)
+                        cs.showText(descLines.get(j));
                     }
                     cs.endText();
 
+                    y -= boxExtraHeight; // Actualizamos offset Y
+
+
                     if ("PAGO".equals(m.get("tipo")) && m.get("medio") != null) {
                         String medio = (String) m.get("medio");
+                        
+                        y -= 12;
+                        cs.beginText();
+                        cs.setFont(PDType1Font.HELVETICA_OBLIQUE, 7);
+                        cs.newLineAtOffset(margin + 20, y - 10);
+                        cs.setNonStrokingColor(new java.awt.Color(100, 100, 100)); // Gris oscurecido
+                        
+                        String subLinea = "Medio de Pago: " + medio.replace("_", " ");
                         if (medio.contains("CHEQUE")) {
-                            y -= 12;
-                            cs.beginText();
-                            cs.setFont(PDType1Font.HELVETICA_OBLIQUE, 7);
-                            cs.newLineAtOffset(margin + 20, y - 10);
-                            cs.setNonStrokingColor(new java.awt.Color(100, 100, 100)); // Gris oscurecido para subtitulo
-                            String chequeDetails = "Detalles de Cheque:";
-                            if (m.get("banco") != null)
-                                chequeDetails += "  Banco: " + m.get("banco");
-                            if (m.get("numeroCheque") != null)
-                                chequeDetails += "  Nº: " + m.get("numeroCheque");
-                            if (m.get("fechaVenc") != null)
-                                chequeDetails += "  Vence: " + m.get("fechaVenc");
-                            cs.showText(chequeDetails);
-                            cs.endText();
-                            cs.setNonStrokingColor(java.awt.Color.BLACK); // Reseteamos color negro normal
+                            subLinea += "  |  Detalles de Cheque:";
+                            if (m.get("banco") != null) subLinea += "  Banco: " + m.get("banco");
+                            if (m.get("numeroCheque") != null) subLinea += "  Nro: " + m.get("numeroCheque");
+                            if (m.get("fechaVenc") != null) subLinea += "  Vence: " + m.get("fechaVenc");
                         }
+                        cs.showText(sanitizeForPdf(subLinea));
+                        cs.endText();
+                        cs.setNonStrokingColor(java.awt.Color.BLACK); // Reseteamos color negro normal
                     }
                 } else {
                     cs.setNonStrokingColor(java.awt.Color.BLACK);
                     cs.beginText();
                     cs.setFont(PDType1Font.HELVETICA, 8);
                     cs.newLineAtOffset(margin + 20, y - 13); // Identación visual limpia
-                    cs.showText(truncate((String) m.get("descripcion"), 55));
+                    
+                    String desc = (String) m.get("descripcion");
+                    if ("USD".equals(m.get("moneda"))) {
+                        desc = "[U$D] " + desc;
+                    }
+                    cs.showText(sanitizeForPdf(truncate(desc, 55)));
 
                     cs.newLineAtOffset(240, 0);
                     cs.showText(m.get("cantidad") != null ? m.get("cantidad").toString() : "-");
@@ -433,20 +531,26 @@ public class ProveedorService {
             cs.beginText();
             cs.setFont(PDType1Font.HELVETICA, 9);
             cs.newLineAtOffset(boxX + 10, y - 20);
-            cs.showText("Total de Compras (+):");
-            cs.newLineAtOffset(140, 0);
-            cs.showText("$ " + String.format("%.2f", ((BigDecimal) data.get("totalCompras")).doubleValue()));
+            cs.showText("Total Compras (ARS) (+):");
+            cs.newLineAtOffset(130, 0);
+            cs.showText("$ " + String.format("%.2f", ((BigDecimal) data.get("totalComprasARS")).doubleValue()));
 
-            cs.newLineAtOffset(-140, -15);
-            cs.showText("Total de Pagos (-):");
-            cs.newLineAtOffset(140, 0);
-            cs.showText("$ " + String.format("%.2f", ((BigDecimal) data.get("totalPagos")).doubleValue()));
+            cs.newLineAtOffset(-130, -15);
+            cs.showText("Total Pagos (ARS) (-):");
+            cs.newLineAtOffset(130, 0);
+            cs.showText("$ " + String.format("%.2f", ((BigDecimal) data.get("totalPagosARS")).doubleValue()));
 
-            cs.newLineAtOffset(-140, -20);
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 12);
-            cs.showText("SALDO FINAL:");
-            cs.newLineAtOffset(125, 0);
-            cs.showText(" $ " + String.format("%.2f", ((BigDecimal) data.get("saldoFinal")).doubleValue()));
+            cs.newLineAtOffset(-130, -20);
+            cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
+            cs.showText("SALDO FINAL ARS:");
+            cs.newLineAtOffset(115, 0);
+            cs.showText(" $ " + String.format("%.2f", ((BigDecimal) data.get("saldoFinalARS")).doubleValue()));
+            
+            cs.newLineAtOffset(-115, -15);
+            cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
+            cs.showText("SALDO FINAL USD:");
+            cs.newLineAtOffset(115, 0);
+            cs.showText(" U$D " + String.format("%.2f", ((BigDecimal) data.get("saldoFinalUSD")).doubleValue()));
             cs.endText();
 
             cs.close();
@@ -460,5 +564,44 @@ public class ProveedorService {
         if (text.length() <= len)
             return text;
         return text.substring(0, len - 3) + "...";
+    }
+
+    private String sanitizeForPdf(String text) {
+        if (text == null) return "";
+        // Reemplazar caracteres ordinales comunes que fallan en Helvetica
+        String replaced = text.replace("N°", "Nro").replace("Nº", "Nro");
+        // Permitir caracteres ASCII básicos y letras acentuadas comunes, reemplazar lo demás
+        return replaced.replaceAll("[^\\x20-\\x7EáéíóúÁÉÍÓÚñÑüÜ]", "");
+    }
+
+    private List<String> splitText(String text, PDType1Font font, float fontSize, float maxWidth) {
+        List<String> lines = new ArrayList<>();
+        if (text == null || text.isEmpty()) return lines;
+        
+        try {
+            String[] words = text.split(" ");
+            StringBuilder currentLine = new StringBuilder();
+
+            for (String word : words) {
+                if (currentLine.length() == 0) {
+                    currentLine.append(word);
+                } else {
+                    String testLine = currentLine.toString() + " " + word;
+                    float width = font.getStringWidth(testLine) / 1000 * fontSize;
+                    if (width <= maxWidth) {
+                        currentLine.append(" ").append(word);
+                    } else {
+                        lines.add(currentLine.toString());
+                        currentLine = new StringBuilder(word);
+                    }
+                }
+            }
+            if (currentLine.length() > 0) {
+                lines.add(currentLine.toString());
+            }
+        } catch (Exception e) {
+            lines.add(text); // Fallback silencioso
+        }
+        return lines;
     }
 }
