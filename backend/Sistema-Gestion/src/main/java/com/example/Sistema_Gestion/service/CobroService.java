@@ -34,19 +34,22 @@ public class CobroService {
     private final RemitoService remitoService;
     private final TesoreriaService tesoreriaService;
     private final ClienteRepository clienteRepository;
+    private final ConfiguracionService configuracionService;
 
     public CobroService(CobroRepository cobroRepository,
             CobroRemitoRepository cobroRemitoRepository,
             RemitoRepository remitoRepository,
             RemitoService remitoService,
             TesoreriaService tesoreriaService,
-            ClienteRepository clienteRepository) {
+            ClienteRepository clienteRepository,
+            ConfiguracionService configuracionService) {
         this.cobroRepository = cobroRepository;
         this.cobroRemitoRepository = cobroRemitoRepository;
         this.remitoRepository = remitoRepository;
         this.remitoService = remitoService;
         this.tesoreriaService = tesoreriaService;
         this.clienteRepository = clienteRepository;
+        this.configuracionService = configuracionService;
     }
 
     /**
@@ -62,21 +65,14 @@ public class CobroService {
             Cobro cobro,
             Map<Long, BigDecimal> importesPorRemito,
             List<CobroMedioPago> mediosPago) {
-        // 1. Calcular y validar el total
-        BigDecimal sumaAplicadaRemitos = importesPorRemito.values().stream()
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // 1. Calcular el total desde los medios de pago (fuente de verdad del dinero recibido)
+        BigDecimal sumaMedios = mediosPago != null ? mediosPago.stream()
+                .map(CobroMedioPago::getImporte)
+                .filter(i -> i != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO;
 
-        // Si se especificaron remitos, el total debe ser la suma de lo aplicado.
-        // Si no (cobro a cuenta), usamos el total ya seteado en el objeto cobro.
-        if (!importesPorRemito.isEmpty()) {
-            cobro.setTotalCobrado(sumaAplicadaRemitos);
-        } else if (cobro.getTotalCobrado() == null || cobro.getTotalCobrado().compareTo(BigDecimal.ZERO) <= 0) {
-            // Validar que si no hay remitos, al menos haya un monto total declarado.
-            BigDecimal sumaMedios = mediosPago != null ? mediosPago.stream()
-                    .map(CobroMedioPago::getImporte)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO;
-            cobro.setTotalCobrado(sumaMedios);
-        }
+        // El totalCobrado del objeto principal DEBE ser la suma de los medios.
+        cobro.setTotalCobrado(sumaMedios);
 
         if (cobro.getFecha() == null) {
             cobro.setFecha(LocalDate.now());
@@ -127,6 +123,9 @@ public class CobroService {
 
         // AF-09: Calcular excedente y acumularlo como saldo a favor
         if (!importesPorRemito.isEmpty() && cobro.getCliente() != null && cobro.getCliente().getId() != null) {
+            BigDecimal sumaAplicadaRemitos = importesPorRemito.values().stream()
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
             // Suma total de los remitos originales (deuda)
             BigDecimal deudaTotal = importesPorRemito.keySet().stream()
                     .map(remitoId -> remitoRepository.findById(remitoId)
@@ -384,10 +383,25 @@ public class CobroService {
 
             // ----- EMPRESA -----
             y -= 22;
+            com.example.Sistema_Gestion.model.Configuracion config = configuracionService.getConfiguracion();
             cs.beginText();
             cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 10);
             cs.newLineAtOffset(margin, y);
-            cs.showText("Leonel Gomez – Agro-Ferretería");
+            cs.showText(config.getNombreEmpresa() != null ? config.getNombreEmpresa() : "Mi Comercio");
+            cs.endText();
+
+            y -= 14;
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 8);
+            cs.newLineAtOffset(margin, y);
+            cs.showText("CUIL: " + (config.getCuit() != null ? config.getCuit() : "—"));
+            cs.endText();
+
+            y -= 12;
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 8);
+            cs.newLineAtOffset(margin, y);
+            cs.showText("Dirección: " + (config.getDireccion() != null ? config.getDireccion() : "—"));
             cs.endText();
 
             // ----- CLIENTE -----
@@ -443,19 +457,26 @@ public class CobroService {
                     cs.setLineWidth(0.2f);
                     cs.addRect(margin, y - 16, w - 2 * margin, 16); cs.stroke();
 
-                    String medioLabel = mp.getMedio() != null ? mp.getMedio().replace("_", " ") : "EFECTIVO";
+                    String rawMedio = mp.getMedio() != null ? mp.getMedio() : "EFECTIVO";
+                    String medioLabel = rawMedio;
+                    if ("EFECTIVO".equals(rawMedio)) medioLabel = "Efectivo";
+                    else if ("TRANSFERENCIA".equals(rawMedio)) medioLabel = "Transferencia";
+                    else if ("CHEQUE".equals(rawMedio)) medioLabel = "Cheque";
+                    else if ("CHEQUE_ELECTRONICO".equals(rawMedio)) medioLabel = "E-Cheque";
+                    else if ("MERCADO_PAGO".equals(rawMedio)) medioLabel = "Mercado Pago";
+
                     String detalleLabel = "";
-                    if (mp.getMedio() != null && mp.getMedio().contains("CHEQUE")) {
+                    if (rawMedio.contains("CHEQUE")) {
                         detalleLabel = "Banco: " + safe(mp.getBanco())
                                 + " | N°: " + safe(mp.getNumeroCheque())
-                                + " | Vto: " + (mp.getFechaVencimiento() != null
-                                        ? mp.getFechaVencimiento().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy")) : "—");
-                    } else if ("TRANSFERENCIA".equals(mp.getMedio())) {
+                                + " | Cobro: " + (mp.getFechaCobro() != null
+                                        ? mp.getFechaCobro().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy")) : "—");
+                    } else if ("TRANSFERENCIA".equals(rawMedio)) {
                         detalleLabel = "Transferencia bancaria";
                     }
 
                     cs.beginText();
-                    cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
+                    cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
                     cs.newLineAtOffset(margin + 5, y - 11); cs.showText(medioLabel); cs.endText();
 
                     cs.beginText();
@@ -538,13 +559,7 @@ public class CobroService {
             }
 
             // ----- FIRMA -----
-            y -= 20;
-            cs.setLineWidth(0.8f);
-            cs.moveTo(margin + 20, y - 2); cs.lineTo(margin + 170, y - 2); cs.stroke();
-            cs.beginText();
-            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
-            cs.newLineAtOffset(margin + 55, y - 14); cs.showText("Firma del cliente"); cs.endText();
-
+            y -= 40;
             cs.moveTo(w - margin - 150, y - 2); cs.lineTo(w - margin - 10, y - 2); cs.stroke();
             cs.beginText();
             cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);

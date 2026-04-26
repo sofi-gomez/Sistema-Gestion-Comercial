@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   FiFileText, FiSearch, FiEdit2, FiTrash2, FiPlus,
   FiDownload, FiDollarSign, FiClock, FiCreditCard,
-  FiShoppingCart, FiList, FiTrendingUp, FiActivity, FiCalendar
+  FiShoppingCart, FiList, FiTrendingUp, FiActivity, FiCalendar, FiTag
 } from "react-icons/fi";
 import RemitoFormModal from "../components/RemitoFormModal";
 import ValorizarSection from "../components/ValorizarSection";
@@ -240,13 +240,15 @@ export default function RemitosPage() {
                     </tr>
                     {expandedRows.has(r.id) && (
                       <tr className="expanded-row">
-                        <td colSpan="5" style={{ padding: "0" }}>
+                        <td colSpan="7" style={{ padding: "0" }}>
                           <div className="expanded-content-wrapper">
                             <table className="modern-table mini">
                               <thead>
                                 <tr>
                                   <th>Producto</th>
                                   <th style={{ textAlign: "center" }}>Cantidad</th>
+                                  {(r.estado === "VALORIZADO" || r.estado === "COBRADO") && <th style={{ textAlign: "right" }}>Precio Unit.</th>}
+                                  {(r.estado === "VALORIZADO" || r.estado === "COBRADO") && <th style={{ textAlign: "right" }}>Subtotal</th>}
                                 </tr>
                               </thead>
                               <tbody>
@@ -254,6 +256,8 @@ export default function RemitosPage() {
                                   <tr key={idx}>
                                     <td>{it.producto?.nombre || "Producto desconocido"}</td>
                                     <td style={{ textAlign: "center" }}>{it.cantidad}</td>
+                                    {(r.estado === "VALORIZADO" || r.estado === "COBRADO") && <td style={{ textAlign: "right" }}>{it.precioUnitario ? `$${it.precioUnitario.toLocaleString()}` : "-"}</td>}
+                                    {(r.estado === "VALORIZADO" || r.estado === "COBRADO") && <td style={{ textAlign: "right" }}>{it.precioUnitario ? `$${(it.cantidad * it.precioUnitario).toLocaleString()}` : "-"}</td>}
                                   </tr>
                                 ))}
                               </tbody>
@@ -331,8 +335,23 @@ export default function RemitosPage() {
                             <FiDollarSign />
                           </button>
                         )}
+                        {(r.estado === "VALORIZADO" || r.estado === "COBRADO") && (
+                          <button
+                            onClick={() => {
+                              if (r.estado === "COBRADO") {
+                                if (!window.confirm("ADVERTENCIA: Este remito ya está COBRADO. Si cambias sus precios, volverá a estado VALORIZADO y podrías tener inconsistencias con los pagos recibidos. ¿Seguro que quieres continuar?")) return;
+                              }
+                              setValorizingRemito(r);
+                            }}
+                            className="icon-btn edit"
+                            style={{ color: "#2563eb", background: "#dbeafe" }}
+                            title="Re-valorizar precios"
+                          >
+                            <FiTag />
+                          </button>
+                        )}
                         <button onClick={() => handleDownloadPdf(r.id, r.numero)} className="icon-btn edit" title="Descargar PDF"><FiDownload /></button>
-                        <button 
+                        <button
                           onClick={() => {
                             if (r.estado !== "PENDIENTE") {
                               if (!window.confirm(`Este remito está ${r.estado}. Editarlo podría afectar la consistencia de los precios y cobros. ¿Deseas continuar?`)) {
@@ -341,8 +360,8 @@ export default function RemitosPage() {
                             }
                             setEditingRemito(r);
                             setModalRemitoOpen(true);
-                          }} 
-                          className="icon-btn edit" 
+                          }}
+                          className="icon-btn edit"
                           title="Editar"
                         >
                           <FiEdit2 />
@@ -384,6 +403,7 @@ export default function RemitosPage() {
                   <th>Items</th>
                   <th>Total</th>
                   <th>Estado</th>
+                  <th style={{ textAlign: "right" }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -422,10 +442,30 @@ export default function RemitosPage() {
                         </td>
                         <td className="price-cell">${v.total?.toLocaleString()}</td>
                         <td><span className="status-badge active">COBRADO</span></td>
+                        <td className="actions-cell">
+                          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                            <button
+                              onClick={() => {
+                                if (v.estado === "COBRADO") {
+                                  if (!window.confirm("ADVERTENCIA: Este remito ya está COBRADO. Si cambias sus precios, volverá a estado VALORIZADO. ¿Seguro que quieres continuar?")) return;
+                                }
+                                setValorizingRemito(v);
+                              }}
+                              className="icon-btn edit"
+                              style={{ color: "#2563eb", background: "#dbeafe" }}
+                              title="Re-valorizar"
+                            >
+                              <FiTag />
+                            </button>
+                            <button onClick={() => handleDownloadPdf(v.id, v.numeroInterno)} className="icon-btn edit" title="Descargar PDF">
+                              <FiDownload />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                       {expandedRows.has(v.id) && (
                         <tr className="expanded-row">
-                          <td colSpan="7" style={{ padding: "0" }}>
+                          <td colSpan="8" style={{ padding: "0" }}>
                             <div className="expanded-content-wrapper">
                               <table className="modern-table mini">
                                 <thead>

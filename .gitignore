@@ -18,6 +18,9 @@ backend/Sistema-Gestion/src/main/resources/application-test.properties
 frontend/.env
 frontend/frontend_error.log
 
+# ⚠️ SEGURIDAD: Archivos con credenciales reales - NUNCA subir al repo público
+backend/Sistema-Gestion/src/main/resources/application.properties
+
 # Database
 *.sql
 

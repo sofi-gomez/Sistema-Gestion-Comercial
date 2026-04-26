@@ -66,6 +66,35 @@ public class ProductoService {
         });
     }
 
+    @Transactional
+    public void forzarDescontarStock(Long productoId, Integer cantidad) {
+        productoRepository.findById(productoId).ifPresent(producto -> {
+            Integer stockActual = producto.getStock() != null ? producto.getStock() : 0;
+            producto.setStock(stockActual - cantidad);
+            productoRepository.save(producto);
+        });
+    }
+
+    @Transactional
+    public Producto actualizarProductoInfo(Long id, Producto data) {
+        return productoRepository.findById(id).map(p -> {
+            p.setNombre(data.getNombre());
+            p.setSku(data.getSku());
+            p.setDescripcion(data.getDescripcion());
+            p.setPrecioCosto(data.getPrecioCosto());
+            p.setPrecioVenta(data.getPrecioVenta());
+            p.setPrecioCostoUSD(data.getPrecioCostoUSD());
+            p.setPrecioVentaUSD(data.getPrecioVentaUSD());
+            p.setUnidadMedida(data.getUnidadMedida());
+            p.setActivo(data.getActivo());
+            p.setFechaVencimiento(data.getFechaVencimiento());
+            p.setPorcentajeIva(data.getPorcentajeIva());
+            p.setPorcentajeUtilidad(data.getPorcentajeUtilidad());
+            // El campo stock NO se actualiza aquí para evitar sobrescrituras accidentales
+            return productoRepository.save(p);
+        }).orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+    }
+
     public boolean tieneStockSuficiente(Long productoId, Integer cantidadRequerida) {
         return productoRepository.findById(productoId)
                 .map(producto -> {
@@ -131,7 +160,7 @@ public class ProductoService {
 
             Row headerRow = sheet.createRow(0);
             String[] columns = { "SKU", "Nombre", "Descripción", "Stock", "Precio Costo", "Precio Venta", "Unidad",
-                    "Vencimiento" };
+                    "Vencimiento", "IVA %", "Utilidad %" };
             for (int i = 0; i < columns.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(columns[i]);
@@ -150,6 +179,8 @@ public class ProductoService {
                 row.createCell(6).setCellValue(p.getUnidadMedida());
                 row.createCell(7)
                         .setCellValue(p.getFechaVencimiento() != null ? p.getFechaVencimiento().toString() : "");
+                row.createCell(8).setCellValue(p.getPorcentajeIva() != null ? p.getPorcentajeIva().doubleValue() : 0);
+                row.createCell(9).setCellValue(p.getPorcentajeUtilidad() != null ? p.getPorcentajeUtilidad().doubleValue() : 0);
             }
 
             workbook.write(out);
@@ -197,6 +228,16 @@ public class ProductoService {
                 }
 
                 p.setUnidadMedida(getCellValueAsString(row.getCell(6)));
+
+                Cell ivaCell = row.getCell(8);
+                if (ivaCell != null && ivaCell.getCellType() == CellType.NUMERIC) {
+                    p.setPorcentajeIva(BigDecimal.valueOf(ivaCell.getNumericCellValue()));
+                }
+
+                Cell utilidadCell = row.getCell(9);
+                if (utilidadCell != null && utilidadCell.getCellType() == CellType.NUMERIC) {
+                    p.setPorcentajeUtilidad(BigDecimal.valueOf(utilidadCell.getNumericCellValue()));
+                }
 
                 productoRepository.save(p);
             }

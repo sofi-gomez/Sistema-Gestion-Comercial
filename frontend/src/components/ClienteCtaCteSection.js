@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiDollarSign, FiTrendingDown, FiCheckCircle, FiFileText, FiPlus, FiExternalLink, FiDownload } from "react-icons/fi";
+import { FiDollarSign, FiTrendingDown, FiCheckCircle, FiFileText, FiPlus, FiExternalLink, FiDownload, FiTrash2 } from "react-icons/fi";
 import CobroFormModal from "./CobroFormModal";
 import { formatDateLocal } from "../utils/dateUtils";
 import { apiFetch } from "../utils/api";
@@ -192,26 +192,53 @@ export default function ClienteCtaCteSection({ clienteId }) {
                                     <td style={{ textAlign: "right", fontWeight: "700", color: m.saldoAcumulado > 0 ? "#ef4444" : "#10b981" }}>
                                         $ {m.saldoAcumulado.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </td>
-                                    <td style={{ textAlign: "center", width: "160px" }}>
+                                    <td style={{ textAlign: "center", width: "200px" }}>
                                         {m.tipo === "HABER" && (
-                                            <button
-                                                className="btn-modern secondary"
-                                                style={{ 
-                                                    padding: "6px 12px", 
-                                                    color: "#3b82f6", 
-                                                    background: "#eff6ff",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    gap: "6px",
-                                                    fontSize: "0.85rem",
-                                                    fontWeight: "600",
-                                                    margin: "0 auto"
-                                                }}
-                                                title="Descargar Recibo"
-                                                onClick={() => downloadRecibo(m.idReferencia)}
-                                            >
-                                                <FiDownload /> Recibo de Cobro
-                                            </button>
+                                            <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                                                <button
+                                                    className="btn-modern secondary"
+                                                    style={{ 
+                                                        padding: "6px 10px", 
+                                                        color: "#3b82f6", 
+                                                        background: "#eff6ff",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "6px",
+                                                        fontSize: "0.8rem",
+                                                        fontWeight: "600"
+                                                    }}
+                                                    title="Descargar Recibo"
+                                                    onClick={() => downloadRecibo(m.idReferencia)}
+                                                >
+                                                    <FiDownload />
+                                                </button>
+                                                <button
+                                                    className="btn-modern danger"
+                                                    style={{ 
+                                                        padding: "6px 10px", 
+                                                        color: "#ef4444", 
+                                                        background: "#fef2f2",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "6px",
+                                                        fontSize: "0.8rem",
+                                                        fontWeight: "600",
+                                                        border: "1px solid #fee2e2"
+                                                    }}
+                                                    title="Anular Cobro"
+                                                    onClick={async () => {
+                                                        if (window.confirm("¿Estás seguro de que deseas anular este cobro? Se revertirá el saldo del cliente y el estado de los remitos asociados.")) {
+                                                            try {
+                                                                const res = await apiFetch(`/api/cobros/${m.idReferencia}/anular`, { method: "DELETE" });
+                                                                if (res.ok) fetchCtaCte();
+                                                                else alert("No se pudo anular el cobro.");
+                                                            } catch (e) { console.error(e); }
+                                                        }
+                                                    }}
+                                                >
+                                                    <FiTrash2 /> Anular
+                                                </button>
+                                            </div>
                                         )}
                                     </td>
                                 </tr>

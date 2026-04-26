@@ -71,10 +71,10 @@ public class CompraService {
     @Transactional
     public Compra actualizarCompra(Long id, Compra compraActualizada) {
         return compraRepository.findById(id).map(compraExistente -> {
-            // Revertir stock viejo
+            // Revertir stock viejo (usamos forzar para permitir negativos técnicos en reversión)
             if (compraExistente.getItems() != null) {
                 for (CompraItem item : compraExistente.getItems()) {
-                    productoService.descontarStock(item.getProducto().getId(), item.getCantidad());
+                    productoService.forzarDescontarStock(item.getProducto().getId(), item.getCantidad());
                 }
             }
 
@@ -151,11 +151,11 @@ public class CompraService {
                 movimientoTesoreriaRepository.save(m);
             }
 
-            // Revertir stock
+            // Revertir stock (usamos forzar para permitir negativos técnicos en anulación de compra)
             if (compra.getItems() != null) {
                 for (CompraItem item : compra.getItems()) {
                     if (item.getProducto() != null && item.getCantidad() != null) {
-                        productoService.descontarStock(item.getProducto().getId(), item.getCantidad());
+                        productoService.forzarDescontarStock(item.getProducto().getId(), item.getCantidad());
                     }
                 }
             }
