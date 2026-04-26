@@ -1,4 +1,4 @@
-# 🌱 Sistema de Gestión Comercial - Leonel Gómez Agro-Ferretería
+# 🌱 Sistema de Gestión Comercial - Agro-Ferretería
 
 Sistema integral de gestión comercial desarrollado para optimizar las operaciones diarias de una agro-ferretería. Esta solución "Premium" abarca desde el control de stock bimoneda hasta la auditoría de documentos financieros y métricas de caja en tiempo real.
 
