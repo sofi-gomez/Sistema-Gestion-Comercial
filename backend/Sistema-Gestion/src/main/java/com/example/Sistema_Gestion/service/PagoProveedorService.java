@@ -27,17 +27,20 @@ public class PagoProveedorService {
     private final CompraRepository compraRepository;
     private final TesoreriaService tesoreriaService;
     private final ProveedorRepository proveedorRepository;
+    private final ConfiguracionService configuracionService;
 
     public PagoProveedorService(PagoProveedorRepository pagoProveedorRepository,
             PagoProveedorCompraRepository pagoProveedorCompraRepository,
             CompraRepository compraRepository,
             TesoreriaService tesoreriaService,
-            ProveedorRepository proveedorRepository) {
+            ProveedorRepository proveedorRepository,
+            ConfiguracionService configuracionService) {
         this.pagoProveedorRepository = pagoProveedorRepository;
         this.pagoProveedorCompraRepository = pagoProveedorCompraRepository;
         this.compraRepository = compraRepository;
         this.tesoreriaService = tesoreriaService;
         this.proveedorRepository = proveedorRepository;
+        this.configuracionService = configuracionService;
     }
 
     /**
@@ -300,10 +303,25 @@ public class PagoProveedorService {
 
             // ----- EMPRESA -----
             y -= 22;
+            com.example.Sistema_Gestion.model.Configuracion config = configuracionService.getConfiguracion();
             cs.beginText();
             cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 10);
             cs.newLineAtOffset(margin, y);
-            cs.showText("Leonel Gomez – Agro-Ferretería");
+            cs.showText(config.getNombreEmpresa() != null ? config.getNombreEmpresa() : "Mi Empresa");
+            cs.endText();
+
+            y -= 14;
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 8);
+            cs.newLineAtOffset(margin, y);
+            cs.showText("CUIL: " + (config.getCuit() != null ? config.getCuit() : "—"));
+            cs.endText();
+
+            y -= 12;
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 8);
+            cs.newLineAtOffset(margin, y);
+            cs.showText("Dirección: " + (config.getDireccion() != null ? config.getDireccion() : "—"));
             cs.endText();
 
             // ----- PROVEEDOR -----

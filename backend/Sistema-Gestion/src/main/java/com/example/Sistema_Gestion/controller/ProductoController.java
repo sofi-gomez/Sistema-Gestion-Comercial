@@ -47,8 +47,7 @@ public class ProductoController {
     @PutMapping("/{id}")
     public Producto actualizar(@PathVariable("id") Long id, @RequestBody Producto producto) {
         log.info("Actualizando producto ID: {}", id);
-        producto.setId(id);
-        return productoService.guardar(producto);
+        return productoService.actualizarProductoInfo(id, producto);
     }
 
     @DeleteMapping("/{id}")

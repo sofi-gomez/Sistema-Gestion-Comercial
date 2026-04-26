@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import {
   FiPackage, FiSearch, FiEdit2, FiTrash2, FiPlus,
-  FiFilter, FiAlertCircle, FiEye, FiEyeOff
+  FiFilter, FiAlertCircle, FiEye, FiEyeOff, FiRotateCcw
 } from "react-icons/fi";
 import ProductoFormModal from "../components/ProductoFormModal";
+import AjusteStockModal from "../components/AjusteStockModal";
 import Toast from "../components/Toast";
 import { apiFetch } from "../utils/api";
 import { formatDateLocal } from "../utils/dateUtils";
@@ -14,10 +15,18 @@ export default function MercaderiaPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterActive, setFilterActive] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
+  const [ajusteModalOpen, setAjusteModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [productoParaAjustar, setProductoParaAjustar] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [toast, setToast] = useState(null);
   const [stockFilter, setStockFilter] = useState("all");
+  const [configuracion, setConfiguracion] = useState(null);
+  const [cotizacionDolar, setCotizacionDolar] = useState("");
+  const [savingCotizacion, setSavingCotizacion] = useState(false);
+  const [activeTab, setActiveTab] = useState("productos");
+  const [historialAjustes, setHistorialAjustes] = useState([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [showCostPrices, setShowCostPrices] = useState(() => {
     const saved = localStorage.getItem("showCostPrices");
     return saved !== null ? JSON.parse(saved) : true;
@@ -39,27 +48,67 @@ export default function MercaderiaPage() {
 
   const API_URL = "/api/productos";
 
-  const fetchProductos = async () => {
+  const fetchProductosAndConfig = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch(API_URL);
-      const data = await res.json();
-      setProductos(data);
+      const [resProd, resConf] = await Promise.all([
+        apiFetch(API_URL),
+        apiFetch("/api/configuracion")
+      ]);
+      const dataProd = await resProd.json();
+      const dataConf = await resConf.json();
+      setProductos(dataProd);
+      setConfiguracion(dataConf);
+      setCotizacionDolar(dataConf.cotizacionDolar || "");
     } catch (err) {
-      console.error("Error cargando productos:", err);
+      console.error("Error cargando productos o configuración:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProductos();
+    fetchProductosAndConfig();
   }, []);
+
+  const fetchHistorial = async () => {
+    setLoadingHistorial(true);
+    try {
+      const res = await apiFetch("/api/ajustes-stock");
+      if (res.ok) setHistorialAjustes(await res.json());
+    } catch (e) { console.error(e); }
+    finally { setLoadingHistorial(false); }
+  };
+
+  useEffect(() => {
+    if (activeTab === "historial") fetchHistorial();
+  }, [activeTab]);
+
+  const handleUpdateCotizacion = async () => {
+    if (!configuracion) return;
+    setSavingCotizacion(true);
+    try {
+      const updatedConf = { ...configuracion, cotizacionDolar: parseFloat(cotizacionDolar) || 0 };
+      const res = await apiFetch("/api/configuracion", {
+        method: "PUT",
+        body: JSON.stringify(updatedConf)
+      });
+      if (res.ok) {
+        setConfiguracion(await res.json());
+        setToast({ title: "Configuración Actualizada", message: "Cotización del Dólar actualizada.", type: "success" });
+      }
+    } catch (e) {
+      console.error(e);
+      setToast({ title: "Error", message: "No se pudo actualizar la cotización.", type: "error" });
+    } finally {
+      setSavingCotizacion(false);
+    }
+  };
 
   const handleDelete = async (id) => {
     if (!window.confirm("¿Seguro que quieres eliminar este producto?")) return;
     await apiFetch(`${API_URL}/${id}`, { method: "DELETE" });
-    fetchProductos();
+    fetchProductosAndConfig();
     setToast({
       title: "Producto eliminado",
       message: "El producto se ha borrado del sistema.",
@@ -78,7 +127,7 @@ export default function MercaderiaPage() {
 
     setModalOpen(false);
     setEditing(null);
-    fetchProductos();
+    fetchProductosAndConfig();
     setToast({
       title: producto.id ? "Producto actualizado" : "Producto creado",
       message: `El producto ${producto.nombre} se guardó correctamente.`,
@@ -155,22 +204,59 @@ export default function MercaderiaPage() {
               <FiPackage />
             </div>
             <div>
-              <h1>Gestión de Mercadería</h1>
-              <p>Administra tu inventario y control de stock</p>
+              <h1>{activeTab === 'productos' ? 'Gestión de Mercadería' : 'Historial de Ajustes'}</h1>
+              <p>{activeTab === 'productos' ? 'Administra tu inventario y control de stock' : 'Consulta los movimientos manuales del inventario'}</p>
             </div>
           </div>
-          {/* Botón para crear nuevo producto */}
-          <button
-            onClick={() => { setEditing(null); setModalOpen(true); }}
-            className="btn-primary"
-          >
-            <FiPlus />
-            Nuevo Producto
-          </button>
+          {activeTab === 'productos' && (
+            <button
+              onClick={() => { setEditing(null); setModalOpen(true); }}
+              className="btn-primary"
+            >
+              <FiPlus />
+              Nuevo Producto
+            </button>
+          )}
         </div>
       </div>
 
-      {/*  ==================== PANEL DE ESTADÍSTICAS (FILTROS) ==================== */}
+      {/* Tabs Selector */}
+      <div className="tabs-container" style={{ marginBottom: "1.5rem", display: "flex", gap: "1rem", borderBottom: "1px solid var(--border)", paddingBottom: "0.5rem" }}>
+        <button 
+          className={`tab-btn ${activeTab === 'productos' ? 'active' : ''}`}
+          onClick={() => setActiveTab('productos')}
+          style={{ 
+            padding: "8px 16px", 
+            border: "none", 
+            background: "none", 
+            cursor: "pointer", 
+            fontWeight: "600",
+            color: activeTab === 'productos' ? "var(--primary)" : "var(--muted)",
+            borderBottom: activeTab === 'productos' ? "2px solid var(--primary)" : "none"
+          }}
+        >
+          Lista de Productos
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'historial' ? 'active' : ''}`}
+          onClick={() => setActiveTab('historial')}
+          style={{ 
+            padding: "8px 16px", 
+            border: "none", 
+            background: "none", 
+            cursor: "pointer", 
+            fontWeight: "600",
+            color: activeTab === 'historial' ? "var(--primary)" : "var(--muted)",
+            borderBottom: activeTab === 'historial' ? "2px solid var(--primary)" : "none"
+          }}
+        >
+          Historial de Ajustes
+        </button>
+      </div>
+
+      {activeTab === "productos" ? (
+        <>
+          {/*  ==================== PANEL DE ESTADÍSTICAS (FILTROS) ==================== */}
       <div className="stats-grid">
         {/* Total de productos */}
         <div
@@ -261,6 +347,19 @@ export default function MercaderiaPage() {
             {showCostPrices ? <FiEye /> : <FiEyeOff />}
             {showCostPrices ? "Ocultar Costos" : "Mostrar Costos"}
           </button>
+          
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px", background: "var(--surface)", padding: "4px 12px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+            <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--muted)" }}>Cotización USD:</span>
+            <span style={{ color: "var(--success)", fontWeight: "600" }}>$</span>
+            <input
+              type="number"
+              style={{ width: "80px", border: "none", outline: "none", background: "transparent", fontSize: "0.95rem", fontWeight: "600", color: "var(--text)" }}
+              value={cotizacionDolar}
+              onChange={(e) => setCotizacionDolar(e.target.value)}
+              onBlur={handleUpdateCotizacion}
+            />
+            {savingCotizacion && <span style={{ fontSize: "0.7rem", color: "var(--primary)" }}>Guardando...</span>}
+          </div>
         </div>
 
         {/* Panel de filtros (se muestra condicionalmente) */}
@@ -386,16 +485,22 @@ export default function MercaderiaPage() {
                             )}
                           </>
                         ) : producto.precioCostoUSD ? (
-                          <span style={{
-                            background: "linear-gradient(135deg, #1e40af, #2563eb)",
-                            color: "white",
-                            padding: "3px 9px",
-                            borderRadius: "6px",
-                            fontSize: "0.8rem",
-                            fontWeight: 700
-                          }}>
-                            USD {Number(producto.precioCostoUSD).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                          </span>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <span style={{
+                              background: "linear-gradient(135deg, #1e40af, #2563eb)",
+                              color: "white",
+                              padding: "3px 9px",
+                              borderRadius: "6px",
+                              fontSize: "0.8rem",
+                              fontWeight: 700,
+                              alignSelf: "flex-start"
+                            }}>
+                              USD {Number(producto.precioCostoUSD).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </span>
+                            {configuracion?.cotizacionDolar > 0 && (
+                                <span style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: "500" }}>Aprox. ${(producto.precioCostoUSD * configuracion.cotizacionDolar).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            )}
+                          </div>
                         ) : (
                           <span style={{ color: "#475569" }}>—</span>
                         )}
@@ -412,16 +517,22 @@ export default function MercaderiaPage() {
                             )}
                           </>
                         ) : producto.precioVentaUSD ? (
-                          <span style={{
-                            background: "linear-gradient(135deg, #065f46, #059669)",
-                            color: "white",
-                            padding: "3px 9px",
-                            borderRadius: "6px",
-                            fontSize: "0.8rem",
-                            fontWeight: 700
-                          }}>
-                            USD {Number(producto.precioVentaUSD).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                          </span>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <span style={{
+                              background: "linear-gradient(135deg, #065f46, #059669)",
+                              color: "white",
+                              padding: "3px 9px",
+                              borderRadius: "6px",
+                              fontSize: "0.8rem",
+                              fontWeight: 700,
+                              alignSelf: "flex-start"
+                            }}>
+                              USD {Number(producto.precioVentaUSD).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </span>
+                            {configuracion?.cotizacionDolar > 0 && (
+                                <span style={{ fontSize: "0.8rem", color: "var(--success)", fontWeight: "600" }}>Aprox. ${(producto.precioVentaUSD * configuracion.cotizacionDolar).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            )}
+                          </div>
                         ) : (
                           <span style={{ color: "#475569" }}>—</span>
                         )}
@@ -453,6 +564,15 @@ export default function MercaderiaPage() {
                       <td className="actions-cell">
                         <div className="action-buttons">
                           <button
+                            onClick={() => { setProductoParaAjustar(producto); setAjusteModalOpen(true); }}
+                            className="icon-btn edit"
+                            title="Ajustar Stock"
+                            style={{ color: "var(--primary)" }}
+                          >
+                            <FiRotateCcw />
+                          </button>
+
+                          <button
                             onClick={() => { setEditing(producto); setModalOpen(true); }}
                             className="icon-btn edit"
                             title="Editar"
@@ -478,13 +598,62 @@ export default function MercaderiaPage() {
           </div>
         )}
       </div>
+      </>
+      ) : (
+        <div className="table-container">
+          {loadingHistorial ? (
+            <div className="loading-state"><div className="loading-spinner"></div><p>Cargando historial...</p></div>
+          ) : historialAjustes.length === 0 ? (
+            <div className="empty-state"><FiRotateCcw /><h3>No hay ajustes registrados</h3></div>
+          ) : (
+            <div className="table-wrapper">
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Motivo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historialAjustes.map(adj => (
+                    <tr key={adj.id}>
+                      <td>{adj.fecha ? formatDateLocal(adj.fecha) : '-'}</td>
+                      <td>{adj.producto?.nombre}</td>
+                      <td>
+                        <span className={`stock-badge ${adj.cantidad > 0 ? 'in-stock' : 'out-of-stock'}`}>
+                          {adj.cantidad > 0 ? `+${adj.cantidad}` : adj.cantidad}
+                        </span>
+                      </td>
+                      <td style={{ fontStyle: "italic", color: "var(--muted)" }}>{adj.motivo}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ==================== MODAL DE FORMULARIO ==================== */}
       {modalOpen && (
         <ProductoFormModal
           producto={editing}
+          cotizacion={configuracion?.cotizacionDolar}
           onClose={() => { setModalOpen(false); setEditing(null); }}
           onSave={handleSave}
+        />
+      )}
+
+      {ajusteModalOpen && (
+        <AjusteStockModal
+          producto={productoParaAjustar}
+          onClose={() => { setAjusteModalOpen(false); setProductoParaAjustar(null); }}
+          onSave={() => {
+            fetchProductosAndConfig();
+            setToast({ title: "Stock Ajustado", message: "El inventario se actualizó correctamente.", type: "success" });
+          }}
         />
       )}
 

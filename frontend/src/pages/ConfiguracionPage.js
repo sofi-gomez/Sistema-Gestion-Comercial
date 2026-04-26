@@ -232,6 +232,36 @@ export default function ConfiguracionPage() {
                                 </button>
                             </div>
 
+                            <div className="config-flex-grid" style={{ marginBottom: "2rem", borderBottom: "1px solid #f1f5f9", paddingBottom: "1.5rem" }}>
+                                <div className="input-field flex-2" style={{ minWidth: "300px" }}>
+                                    <label>Nombre de la Empresa</label>
+                                    <input
+                                        type="text"
+                                        value={config.nombreEmpresa || ""}
+                                        onChange={e => setConfig({ ...config, nombreEmpresa: e.target.value })}
+                                        placeholder="Ej: Agro-Ferretería Gomez"
+                                    />
+                                </div>
+                                <div className="input-field flex-1">
+                                    <label>CUIL / CUIT</label>
+                                    <input
+                                        type="text"
+                                        value={config.cuit || ""}
+                                        onChange={e => setConfig({ ...config, cuit: e.target.value })}
+                                        placeholder="Ej: 20-XXXXXXXX-X"
+                                    />
+                                </div>
+                                <div className="input-field flex-2" style={{ minWidth: "350px", width: "100%" }}>
+                                    <label>Dirección Comercial</label>
+                                    <input
+                                        type="text"
+                                        value={config.direccion || ""}
+                                        onChange={e => setConfig({ ...config, direccion: e.target.value })}
+                                        placeholder="Calle, Número, Localidad..."
+                                    />
+                                </div>
+                            </div>
+
                             <div className="config-flex-grid">
                                 <div className="input-field flex-1">
                                     <label>Cotización Dólar (Venta)</label>

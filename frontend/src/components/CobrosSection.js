@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { FiCheckCircle, FiDollarSign } from "react-icons/fi";
+import { FiCheckCircle, FiDollarSign, FiTag } from "react-icons/fi";
 import CobroFormModal from "./CobroFormModal";
+import ValorizarSection from "./ValorizarSection";
 import { apiFetch } from "../utils/api";
 
 const API_COBROS = "/api/cobros";
@@ -10,6 +11,7 @@ export default function CobrosSection({ onUpdate }) {
     const [remitos, setRemitos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [cobrandoRemito, setCobrandoRemito] = useState(null);
+    const [revalorizandoRemito, setRevalorizandoRemito] = useState(null);
     const [expandedRows, setExpandedRows] = useState(new Set());
 
     const toggleRow = (id) => {
@@ -73,13 +75,23 @@ export default function CobrosSection({ onUpdate }) {
                                         <td className="price-cell">${r.total?.toLocaleString()}</td>
                                         <td>{r.cotizacionDolar ? `$${r.cotizacionDolar}` : "-"}</td>
                                         <td style={{ textAlign: "right", width: "1%", whiteSpace: "nowrap", paddingRight: "1.5rem" }}>
-                                            <button
-                                                className="btn-primary"
-                                                style={{ background: "#10b981", border: "none", padding: "6px 16px", fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
-                                                onClick={() => setCobrandoRemito(r)}
-                                            >
-                                                <FiDollarSign size={14} /> Cobrar
-                                            </button>
+                                            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                                                <button
+                                                    className="icon-btn edit"
+                                                    style={{ color: "#2563eb", background: "#dbeafe", padding: "6px" }}
+                                                    title="Re-valorizar"
+                                                    onClick={() => setRevalorizandoRemito(r)}
+                                                >
+                                                    <FiTag />
+                                                </button>
+                                                <button
+                                                    className="btn-primary"
+                                                    style={{ background: "#10b981", border: "none", padding: "6px 16px", fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                                                    onClick={() => setCobrandoRemito(r)}
+                                                >
+                                                    <FiDollarSign size={14} /> Cobrar
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     {expandedRows.has(r.id) && (
@@ -91,6 +103,8 @@ export default function CobrosSection({ onUpdate }) {
                                                             <tr>
                                                                 <th>Producto</th>
                                                                 <th style={{ textAlign: "center" }}>Cantidad</th>
+                                                                <th style={{ textAlign: "right" }}>Precio Unit.</th>
+                                                                <th style={{ textAlign: "right" }}>Subtotal</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -98,6 +112,8 @@ export default function CobrosSection({ onUpdate }) {
                                                                 <tr key={idx}>
                                                                     <td>{it.producto?.nombre || "Producto desconocido"}</td>
                                                                     <td style={{ textAlign: "center" }}>{it.cantidad}</td>
+                                                                    <td style={{ textAlign: "right" }}>{it.precioUnitario ? `$${it.precioUnitario.toLocaleString()}` : "-"}</td>
+                                                                    <td style={{ textAlign: "right" }}>{it.precioUnitario ? `$${(it.cantidad * it.precioUnitario).toLocaleString()}` : "-"}</td>
                                                                 </tr>
                                                             ))}
                                                         </tbody>
@@ -124,6 +140,18 @@ export default function CobrosSection({ onUpdate }) {
                         onUpdate();
                         fetchValorizados();
                     }}
+                />
+            )}
+
+            {revalorizandoRemito && (
+                <ValorizarSection
+                    initialRemito={revalorizandoRemito}
+                    onUpdate={() => {
+                        setRevalorizandoRemito(null);
+                        onUpdate();
+                        fetchValorizados();
+                    }}
+                    onClose={() => setRevalorizandoRemito(null)}
                 />
             )}
         </div>

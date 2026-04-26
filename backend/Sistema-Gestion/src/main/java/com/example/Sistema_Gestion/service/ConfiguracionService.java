@@ -36,7 +36,9 @@ public class ConfiguracionService {
 
     private Configuracion crearConfiguracionDefault() {
         Configuracion def = new Configuracion();
-        def.setNombreEmpresa("Mi Comercio");
+        def.setNombreEmpresa("Leonel Gomez – Agro-Ferretería");
+        def.setCuit("20-23291335-6");
+        def.setDireccion("B° Terrazas del Valle MY C19 Cordón Del Plata");
         def.setCotizacionDolar(new BigDecimal("1200.00"));
         def.setMonedaPrincipal("ARS");
         def.setStockMinimoGlobal(5);

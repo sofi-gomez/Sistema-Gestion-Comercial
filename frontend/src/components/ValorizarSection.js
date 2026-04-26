@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { FiDollarSign, FiCheckCircle, FiX } from "react-icons/fi";
+import { FiDollarSign, FiCheckCircle, FiX, FiAlertTriangle } from "react-icons/fi";
 import Toast from "./Toast";
 import { formatDateLocal } from "../utils/dateUtils";
 import { apiFetch } from "../utils/api";
@@ -15,271 +15,311 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
     const [toast, setToast] = useState(null);
     const [currency, setCurrency] = useState("ARS");
 
+    // Helper para convertir strings con comas a números válidos
+    const parseSafeFloat = (val) => {
+        if (val === undefined || val === null || val === "") return 0;
+        const stringVal = val.toString().replace(/\./g, "").replace(",", ".");
+        const parsed = parseFloat(stringVal);
+        return isNaN(parsed) ? 0 : parsed;
+    };
+
     const getSuggestedPrice = (item, cur) => {
         if (cur === "USD") return item.producto?.precioVentaUSD?.toString() || "";
         return item.producto?.precioVenta?.toString() || "";
     };
 
-    const applyAllSuggestions = (items, cur) => {
+    const getInitialPrices = (items, cur) => {
         const map = {};
-        items.forEach(i => { map[i.id] = getSuggestedPrice(i, cur); });
+        items.forEach(i => {
+            // Si el remito ya estaba valorizado y estamos en ARS, mantenemos los precios actuales
+            if (i.precioUnitario && cur === "ARS") {
+                map[i.id] = i.precioUnitario.toString().replace(".", ",");
+            } else {
+                map[i.id] = getSuggestedPrice(i, cur).replace(".", ",");
+            }
+        });
         return map;
     };
 
+    // Efecto para manejar el remito inicial (edición/re-valorización)
     useEffect(() => {
         if (initialRemito) {
-            setPrecios(applyAllSuggestions(initialRemito.items, "ARS"));
+            const isUsd = initialRemito.cotizacionDolar && initialRemito.cotizacionDolar > 0;
+            if (isUsd) {
+                setCurrency("USD");
+                setCotizacion(initialRemito.cotizacionDolar.toString().replace(".", ","));
+                
+                const map = {};
+                initialRemito.items.forEach(item => {
+                    const priceArs = item.precioUnitario || 0;
+                    const priceUsd = priceArs / initialRemito.cotizacionDolar;
+                    map[item.id] = priceUsd.toFixed(2).replace(".", ",");
+                });
+                setPrecios(map);
+            } else {
+                setCurrency("ARS");
+                setPrecios(getInitialPrices(initialRemito.items, "ARS"));
+            }
             setSelected(initialRemito);
         }
     }, [initialRemito]);
 
+    // Cargar remitos pendientes para la lista
     const fetchPendientes = async () => {
         try {
             const res = await apiFetch(`${API_REMITOS}?estado=PENDIENTE`);
-            setRemitos(await res.json());
-        } catch (e) { console.error(e); }
+            if (res.ok) setRemitos(await res.json());
+        } catch (e) { console.error("Error cargando pendientes:", e); }
     };
 
-    useEffect(() => { fetchPendientes(); }, []);
+    useEffect(() => {
+        if (!initialRemito) fetchPendientes();
+    }, [initialRemito]);
 
     const handleValorizar = async () => {
-        if (currency === "USD" && (!cotizacion || parseFloat(cotizacion) <= 0)) {
+        const cotizacionNum = parseSafeFloat(cotizacion);
+        if (currency === "USD" && cotizacionNum <= 0) {
             alert("Debe ingresar una cotización válida para valorizar en dólares.");
             return;
         }
-        // Validar que todos los precios sean > 0
+
         if (!selected || !selected.items || selected.items.length === 0) {
             alert("El remito no tiene ítems.");
             return;
         }
-        const precioInvalido = selected.items.some(i => {
-            const p = parseFloat(precios[i.id]);
-            return !p || p <= 0;
+
+        const preciosFinales = {};
+        let tienePrecioInvalido = false;
+
+        selected.items.forEach(i => {
+            const p = parseSafeFloat(precios[i.id]);
+            if (p <= 0) tienePrecioInvalido = true;
+            preciosFinales[i.id] = p * (currency === "USD" ? cotizacionNum : 1);
         });
-        if (precioInvalido) {
+
+        if (tienePrecioInvalido) {
             alert("Todos los precios unitarios deben ser mayores a 0 para poder valorizar.");
             return;
         }
 
         setSaving(true);
         try {
-            const tasa = currency === "USD" ? parseFloat(cotizacion) : 1;
             const body = {
-                cotizacionDolar: cotizacion ? parseFloat(cotizacion) : null,
-                precios: Object.fromEntries(
-                    Object.entries(precios).map(([k, v]) => [k, parseFloat(v) * tasa])
-                ),
+                cotizacionDolar: currency === "USD" ? cotizacionNum : null,
+                precios: preciosFinales
             };
+
             const res = await apiFetch(`${API_REMITOS}/${selected.id}/valorizar`, {
                 method: "POST",
                 body: JSON.stringify(body),
             });
+
             if (res.ok) {
                 const data = await res.json();
                 setToast({
-                    title: "Remito valorizado",
-                    message: `El remito #${selected.numero} ha sido valorizado con éxito.`,
+                    title: "Éxito",
+                    message: `Remito #${selected.numero} valorizado correctamente.`,
                     type: "success"
                 });
-                setSelected(null);
-                fetchPendientes();
-                onUpdate(data);
+                if (initialRemito) {
+                    setTimeout(() => onUpdate(data), 1500);
+                } else {
+                    setSelected(null);
+                    fetchPendientes();
+                    onUpdate(data);
+                }
+            } else {
+                throw new Error("Fallo en el servidor");
             }
         } catch (e) {
             setToast({
                 title: "Error",
-                message: "No se pudo valorizar el remito.",
+                message: "No se pudo guardar la valorización. Revisa los datos.",
                 type: "error"
             });
+        } finally {
+            setSaving(false);
         }
-        finally { setSaving(false); }
     };
 
     const calculateTotal = () => {
         if (!selected || !selected.items) return 0;
         return selected.items.reduce((acc, item) => {
-            const precio = parseFloat(precios[item.id]) || 0;
+            const precio = parseSafeFloat(precios[item.id]);
             return acc + (precio * item.cantidad);
         }, 0);
     };
 
     const currentTotal = calculateTotal();
-    const totalInArs = currency === "USD" ? currentTotal * (parseFloat(cotizacion) || 0) : currentTotal;
+    const cotizacionValue = parseSafeFloat(cotizacion);
+    const totalInArs = currency === "USD" ? currentTotal * cotizacionValue : currentTotal;
 
-    if (initialRemito && selected) {
+    const renderModal = () => {
+        if (!selected) return null;
+
+        const isReValorizar = selected.estado === "VALORIZADO" || selected.estado === "COBRADO";
+
         return (
-            <>
-                <div className="modal-overlay" onClick={onClose}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: "700px" }}>
-                        <div className="modal-header">
-                            <h2>Valorizar Remito #{selected.numero}</h2>
-                            <button className="modal-close" onClick={onClose}><FiX /></button>
-                        </div>
-                        <div className="modal-content">
-                            <div className="form-grid" style={{ gridTemplateColumns: currency === "USD" ? "1fr 1fr" : "1fr" }}>
-                                <div className="form-group">
-                                    <label className="form-label">Moneda de Valorización</label>
-                                    <select
-                                        className="modern-input"
-                                        value={currency}
-                                        onChange={e => {
-                                            const cur = e.target.value;
-                                            setCurrency(cur);
-                                            if (selected) setPrecios(applyAllSuggestions(selected.items, cur));
-                                        }}
-                                    >
-                                        <option value="ARS">Pesos (ARS)</option>
-                                        <option value="USD">Dólares (USD)</option>
-                                    </select>
-                                </div>
-                                {currency === "USD" && (
-                                    <div className="form-group">
-                                        <label className="form-label">Cotización Dólar</label>
-                                        <input
-                                            className="modern-input"
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="0.00"
-                                            value={cotizacion}
-                                            onChange={e => setCotizacion(e.target.value)}
-                                            onWheel={(e) => e.target.blur()}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-
-                            <div style={{ marginTop: "1.5rem" }}>
-                                <label className="form-label">Precios Unitarios ({currency})</label>
-                                <div className="table-wrapper" style={{ border: "1px solid var(--border)", borderRadius: "8px", marginTop: "0.5rem" }}>
-                                    <table className="modern-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Producto</th>
-                                                <th>Cant.</th>
-                                                <th>P. Unitario ({currency})</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {selected.items.map(i => (
-                                                <tr key={i.id}>
-                                                    <td>
-                                                        <div className="product-info">
-                                                            <h4>{i.productoNombre || i.producto?.nombre}</h4>
-                                                            <p>ID: {i.id}</p>
-                                                        </div>
-                                                    </td>
-                                                    <td><span className="stock-badge in-stock">{i.cantidad}</span></td>
-                                                    <td>
-                                                        <div style={{ position: "relative" }}>
-                                                            <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--muted)" }}>{currency === "ARS" ? "$" : "u$d"}</span>
-                                                            <input
-                                                                className="modern-input"
-                                                                type="number"
-                                                                step="0.01"
-                                                                placeholder="0.00"
-                                                                style={{ paddingLeft: currency === "ARS" ? "25px" : "40px" }}
-                                                                value={precios[i.id]}
-                                                                onChange={e => setPrecios({ ...precios, [i.id]: e.target.value })}
-                                                                onWheel={(e) => e.target.blur()}
-                                                            />
-                                                            {(() => {
-                                                                const suggested = getSuggestedPrice(i, currency);
-                                                                if (!suggested) return null;
-                                                                return (
-                                                                    <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                                                        <span>Catálogo: {currency === "ARS" ? "$" : "USD"} {Number(suggested).toLocaleString()}</span>
-                                                                        {precios[i.id] !== suggested && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setPrecios({ ...precios, [i.id]: suggested })}
-                                                                                style={{ background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: "0.8rem", padding: 0 }}
-                                                                                title="Restaurar precio de catálogo"
-                                                                            >↺</button>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <div className="total-calculator" style={{
-                                marginTop: "1.5rem",
-                                padding: "1.2rem",
-                                background: "var(--success-bg, #e8f5e9)",
-                                borderRadius: "12px",
-                                border: "1px solid var(--success-border, #c8e6c9)",
+            <div className="modal-overlay" onClick={() => initialRemito ? onClose() : setSelected(null)}>
+                <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: "750px" }}>
+                    <div className="modal-header">
+                        <h2>{isReValorizar ? "Re-valorizar" : "Valorizar"} Remito #{selected.numero}</h2>
+                        <button className="modal-close" onClick={() => initialRemito ? onClose() : setSelected(null)}><FiX /></button>
+                    </div>
+                    
+                    <div className="modal-content">
+                        {selected.estado === "COBRADO" && (
+                            <div className="alert-banner" style={{ 
+                                backgroundColor: "#fff3cd", 
+                                color: "#856404", 
+                                padding: "12px", 
+                                borderRadius: "8px", 
+                                marginBottom: "1rem",
                                 display: "flex",
-                                flexDirection: "column",
-                                gap: "8px",
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
+                                alignItems: "center",
+                                gap: "10px",
+                                border: "1px solid #ffeeba"
                             }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <div style={{ color: "var(--success, #2e7d32)", fontSize: "0.9rem", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                        Total a Valorizar ({currency})
-                                    </div>
-                                    <div style={{ fontSize: "1.8rem", fontWeight: "700", color: "#1b5e20", fontFamily: "monospace" }}>
-                                        {currency === "ARS" ? "$" : "u$s"} {currentTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </div>
-                                </div>
-                                {currency === "USD" && (
-                                    <div style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        borderTop: "1px dashed #c8e6c9",
-                                        paddingTop: "8px",
-                                        marginTop: "4px"
-                                    }}>
-                                        <div style={{ color: "#388e3c", fontSize: "0.85rem", fontStyle: "italic" }}>Equivalente en Pesos (ARS)</div>
-                                        <div style={{ fontSize: "1.2rem", fontWeight: "600", color: "#2e7d32" }}>
-                                            $ {totalInArs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </div>
-                                    </div>
-                                )}
+                                <FiAlertTriangle />
+                                <span><strong>Atención:</strong> Este remito ya está cobrado. Al re-valorizarlo, su estado volverá a "VALORIZADO".</span>
                             </div>
+                        )}
+
+                        <div className="form-grid" style={{ gridTemplateColumns: currency === "USD" ? "1fr 1fr" : "1fr" }}>
+                            <div className="form-group">
+                                <label className="form-label">Moneda</label>
+                                <select 
+                                    className="modern-input" 
+                                    value={currency}
+                                    onChange={e => {
+                                        const cur = e.target.value;
+                                        setCurrency(cur);
+                                        setPrecios(getInitialPrices(selected.items, cur));
+                                    }}
+                                >
+                                    <option value="ARS">Pesos (ARS)</option>
+                                    <option value="USD">Dólares (USD)</option>
+                                </select>
+                            </div>
+                            {currency === "USD" && (
+                                <div className="form-group">
+                                    <label className="form-label">Cotización</label>
+                                    <input 
+                                        className="modern-input"
+                                        type="text"
+                                        placeholder="0,00"
+                                        value={cotizacion}
+                                        onChange={e => setCotizacion(e.target.value)}
+                                    />
+                                </div>
+                            )}
                         </div>
 
-                        <div className="modal-actions">
-                            <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-                            <button className="btn-primary" onClick={handleValorizar} disabled={saving} style={{ backgroundColor: "var(--success)" }}>
-                                {saving ? "Valorizando..." : <><FiCheckCircle /> Confirmar Valorización</>}
-                            </button>
+                        <div className="table-wrapper" style={{ marginTop: "1.5rem", border: "1px solid var(--border)", borderRadius: "8px" }}>
+                            <table className="modern-table">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th style={{ textAlign: "center" }}>Cant.</th>
+                                        <th>Precio Unit. ({currency})</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selected.items.map(i => (
+                                        <tr key={i.id}>
+                                            <td>
+                                                <div className="product-info">
+                                                    <strong>{i.productoNombre || i.producto?.nombre}</strong>
+                                                    <small style={{ display: "block", color: "var(--muted)" }}>ID: {i.id}</small>
+                                                </div>
+                                            </td>
+                                            <td style={{ textAlign: "center" }}>
+                                                <span className="stock-badge in-stock">{i.cantidad}</span>
+                                            </td>
+                                            <td>
+                                                <div style={{ position: "relative" }}>
+                                                    <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--muted)" }}>
+                                                        {currency === "ARS" ? "$" : "u$s"}
+                                                    </span>
+                                                    <input 
+                                                        className="modern-input"
+                                                        type="text"
+                                                        style={{ paddingLeft: "35px" }}
+                                                        value={precios[i.id] || ""}
+                                                        onChange={e => setPrecios({ ...precios, [i.id]: e.target.value })}
+                                                    />
+                                                    {(() => {
+                                                        const sug = getSuggestedPrice(i, currency);
+                                                        if (!sug) return null;
+                                                        return (
+                                                            <div style={{ fontSize: "0.7rem", marginTop: "2px", display: "flex", justifyContent: "space-between" }}>
+                                                                <span>Catálogo: {sug}</span>
+                                                                <button 
+                                                                    className="text-link" 
+                                                                    onClick={() => setPrecios({ ...precios, [i.id]: sug.replace(".", ",") })}
+                                                                    style={{ color: "var(--primary)", border: "none", background: "none", cursor: "pointer", fontSize: "0.7rem" }}
+                                                                >Usar sugerencia</button>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
+
+                        <div className="total-calculator" style={{ 
+                            marginTop: "1.5rem", 
+                            padding: "1rem", 
+                            background: "#f8f9fa", 
+                            borderRadius: "10px",
+                            border: "1px solid #dee2e6"
+                        }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span style={{ fontWeight: "600" }}>TOTAL ({currency}):</span>
+                                <span style={{ fontSize: "1.4rem", fontWeight: "BOLD" }}>
+                                    {currency === "ARS" ? "$" : "u$s"} {currentTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            {currency === "USD" && (
+                                <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #ccc", marginTop: "8px", paddingTop: "8px" }}>
+                                    <small>Total en Pesos:</small>
+                                    <strong style={{ color: "var(--success)" }}>
+                                        $ {totalInArs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </strong>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="modal-actions">
+                        <button className="btn-secondary" onClick={() => initialRemito ? onClose() : setSelected(null)}>Cancelar</button>
+                        <button className="btn-primary" onClick={handleValorizar} disabled={saving} style={{ backgroundColor: "var(--success)" }}>
+                            {saving ? "Guardando..." : "Confirmar Valorización"}
+                        </button>
                     </div>
                 </div>
-                {toast && (
-                    <div className="toast-container">
-                        <Toast
-                            title={toast.title}
-                            message={toast.message}
-                            type={toast.type}
-                            onClose={() => setToast(null)}
-                        />
-                    </div>
-                )}
-            </>
+            </div>
         );
-    }
+    };
+
+    if (initialRemito) return <>{renderModal()}{toast && <Toast {...toast} onClose={() => setToast(null)} />}</>;
 
     return (
         <div className="valorizar-section">
             <div className="table-container">
                 {remitos.length === 0 ? (
                     <div className="empty-state">
-                        <FiCheckCircle size={40} />
-                        <h3>Todo valorizado</h3>
+                        <FiCheckCircle size={40} color="var(--success)" />
+                        <h3>Sin remitos pendientes</h3>
                     </div>
                 ) : (
                     <table className="modern-table">
                         <thead>
                             <tr>
-                                <th>Nº Remito</th>
+                                <th># Remito</th>
                                 <th>Fecha</th>
                                 <th>Cliente</th>
                                 <th>Acción</th>
@@ -288,17 +328,15 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                         <tbody>
                             {remitos.map(r => (
                                 <tr key={r.id}>
-                                    <td className="sku-cell"><span className="sku-badge">#{r.numero}</span></td>
+                                    <td><strong>#{r.numero}</strong></td>
                                     <td>{formatDateLocal(r.fecha)}</td>
                                     <td>{r.clienteNombre}</td>
                                     <td>
                                         <button className="btn-primary" style={{ backgroundColor: "var(--success)" }} onClick={() => {
                                             setSelected(r);
-                                            setCurrency("ARS"); // Reset a pesos al elegir uno nuevo
-                                            setPrecios(applyAllSuggestions(r.items, "ARS"));
-                                        }}>
-                                            <FiDollarSign /> Valorizar
-                                        </button>
+                                            setCurrency("ARS");
+                                            setPrecios(getInitialPrices(r.items, "ARS"));
+                                        }}><FiDollarSign /> Valorizar</button>
                                     </td>
                                 </tr>
                             ))}
@@ -306,164 +344,8 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
                     </table>
                 )}
             </div>
-
-            {selected && !initialRemito && (
-                <div className="modal-overlay" onClick={() => setSelected(null)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: "700px" }}>
-                        <div className="modal-header">
-                            <h2>Valorizar Remito #{selected.numero}</h2>
-                            <button className="modal-close" onClick={() => setSelected(null)}><FiX /></button>
-                        </div>
-                        <div className="modal-content">
-                            <div className="form-grid" style={{ gridTemplateColumns: currency === "USD" ? "1fr 1fr" : "1fr" }}>
-                                <div className="form-group">
-                                    <label className="form-label">Moneda de Valorización</label>
-                                    <select
-                                        className="modern-input"
-                                        value={currency}
-                                        onChange={e => {
-                                            const cur = e.target.value;
-                                            setCurrency(cur);
-                                            if (selected) setPrecios(applyAllSuggestions(selected.items, cur));
-                                        }}
-                                    >
-                                        <option value="ARS">Pesos (ARS)</option>
-                                        <option value="USD">Dólares (USD)</option>
-                                    </select>
-                                </div>
-                                {currency === "USD" && (
-                                    <div className="form-group">
-                                        <label className="form-label">Cotización Dólar</label>
-                                        <input
-                                            className="modern-input"
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="0.00"
-                                            value={cotizacion}
-                                            onChange={e => setCotizacion(e.target.value)}
-                                            onWheel={(e) => e.target.blur()}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-
-                            <div style={{ marginTop: "1.5rem" }}>
-                                <label className="form-label">Precios Unitarios ({currency})</label>
-                                <div className="table-wrapper" style={{ border: "1px solid var(--border)", borderRadius: "8px", marginTop: "0.5rem" }}>
-                                    <table className="modern-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Producto</th>
-                                                <th>Cant.</th>
-                                                <th>P. Unitario ({currency})</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {selected.items.map(i => (
-                                                <tr key={i.id}>
-                                                    <td>
-                                                        <div className="product-info">
-                                                            <h4>{i.productoNombre || i.producto?.nombre}</h4>
-                                                            <p>ID: {i.id}</p>
-                                                        </div>
-                                                    </td>
-                                                    <td><span className="stock-badge in-stock">{i.cantidad}</span></td>
-                                                    <td>
-                                                        <div style={{ position: "relative" }}>
-                                                            <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--muted)" }}>{currency === "ARS" ? "$" : "u$d"}</span>
-                                                            <input
-                                                                className="modern-input"
-                                                                type="number"
-                                                                step="0.01"
-                                                                placeholder="0.00"
-                                                                style={{ paddingLeft: currency === "ARS" ? "25px" : "40px" }}
-                                                                value={precios[i.id]}
-                                                                onChange={e => setPrecios({ ...precios, [i.id]: e.target.value })}
-                                                                onWheel={(e) => e.target.blur()}
-                                                            />
-                                                            {(() => {
-                                                                const suggested = getSuggestedPrice(i, currency);
-                                                                if (!suggested) return null;
-                                                                return (
-                                                                    <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                                                        <span>Catálogo: {currency === "ARS" ? "$" : "USD"} {Number(suggested).toLocaleString()}</span>
-                                                                        {precios[i.id] !== suggested && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setPrecios({ ...precios, [i.id]: suggested })}
-                                                                                style={{ background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: "0.8rem", padding: 0 }}
-                                                                                title="Restaurar precio de catálogo"
-                                                                            >↺</button>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <div className="total-calculator" style={{
-                                marginTop: "1.5rem",
-                                padding: "1.2rem",
-                                background: "var(--success-bg, #e8f5e9)",
-                                borderRadius: "12px",
-                                border: "1px solid var(--success-border, #c8e6c9)",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "8px",
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
-                            }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <div style={{ color: "var(--success, #2e7d32)", fontSize: "0.9rem", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                        Total a Valorizar ({currency})
-                                    </div>
-                                    <div style={{ fontSize: "1.8rem", fontWeight: "700", color: "#1b5e20", fontFamily: "monospace" }}>
-                                        {currency === "ARS" ? "$" : "u$s"} {currentTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </div>
-                                </div>
-                                {currency === "USD" && (
-                                    <div style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        borderTop: "1px dashed #c8e6c9",
-                                        paddingTop: "8px",
-                                        marginTop: "4px"
-                                    }}>
-                                        <div style={{ color: "#388e3c", fontSize: "0.85rem", fontStyle: "italic" }}>Equivalente en Pesos (ARS)</div>
-                                        <div style={{ fontSize: "1.2rem", fontWeight: "600", color: "#2e7d32" }}>
-                                            $ {totalInArs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="modal-actions">
-                            <button className="btn-secondary" onClick={() => setSelected(null)}>Cancelar</button>
-                            <button className="btn-primary" onClick={handleValorizar} disabled={saving} style={{ backgroundColor: "var(--success)" }}>
-                                {saving ? "Valorizando..." : <><FiCheckCircle /> Confirmar Valorización</>}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {toast && (
-                <div className="toast-container">
-                    <Toast
-                        title={toast.title}
-                        message={toast.message}
-                        type={toast.type}
-                        onClose={() => setToast(null)}
-                    />
-                </div>
-            )}
+            {renderModal()}
+            {toast && <Toast {...toast} onClose={() => setToast(null)} />}
         </div>
     );
 }

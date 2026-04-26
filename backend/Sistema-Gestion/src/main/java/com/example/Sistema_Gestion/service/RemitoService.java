@@ -20,16 +20,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.example.Sistema_Gestion.model.Configuracion;
+
 @Service
 public class RemitoService {
 
     private final RemitoRepository remitoRepository;
     private final ProductoService productoService;
+    private final ConfiguracionService configuracionService;
 
     public RemitoService(RemitoRepository remitoRepository,
-            ProductoService productoService) {
+            ProductoService productoService,
+            ConfiguracionService configuracionService) {
         this.remitoRepository = remitoRepository;
         this.productoService = productoService;
+        this.configuracionService = configuracionService;
     }
 
     public List<Remito> listarTodos() {
@@ -112,9 +117,8 @@ public class RemitoService {
         Remito remito = remitoRepository.findById(remitoId)
                 .orElseThrow(() -> new RuntimeException("Remito no encontrado: " + remitoId));
 
-        if (remito.getEstado() == Remito.EstadoRemito.COBRADO) {
-            throw new IllegalStateException("No se puede valorizar un remito ya cobrado");
-        }
+        // Se permite re-valorizar incluso si está cobrado para corregir errores excepcionales.
+        // El estado volverá a VALORIZADO automáticamente líneas abajo.
 
         BigDecimal total = BigDecimal.ZERO;
         for (RemitoItem item : remito.getItems()) {
@@ -210,10 +214,14 @@ public class RemitoService {
                 remitoPersistido.addItem(newItem);
                 
                 if (newItem.getProducto() != null && newItem.getCantidad() != null) {
-                    productoService.descontarStock(
+                    boolean ok = productoService.descontarStock(
                         newItem.getProducto().getId(), 
                         newItem.getCantidad().intValue()
                     );
+                    if (!ok) {
+                        throw new RuntimeException("Stock insuficiente para el producto: " + 
+                            (newItem.getProducto() != null ? newItem.getProducto().getNombre() : "Desconocido"));
+                    }
                 }
             }
         }
@@ -233,58 +241,91 @@ public class RemitoService {
             float x = margin;
             float y = h - margin;
 
-            // Logo en esquina superior izquierda
+            // --- HEADER SECTION ---
+            float currentY = h - margin;
+            
+            // 1. Logo (Top Left)
             if (logoBytes != null) {
                 try {
                     PDImageXObject pdImage = PDImageXObject.createFromByteArray(doc, logoBytes, "logo");
-                    float logoW = 60;
-                    float logoH = 60;
-                    cs.drawImage(pdImage, x, y - logoH, logoW, logoH);
+                    cs.drawImage(pdImage, x, currentY - 60, 60, 60);
                 } catch (Exception ex) {
-                    // Continuar sin logo
+                    // Ignorar error de logo
                 }
             }
 
-            // Título "REMITO" centrado
+            // 2. Título "REMITO" (Centrado y Grande)
             cs.beginText();
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 24);
-            cs.newLineAtOffset(w / 2 - 40, y - 30);
+            cs.setFont(PDType1Font.HELVETICA_BOLD, 22);
+            cs.newLineAtOffset(w / 2f - 40, currentY - 30);
             cs.showText("REMITO");
             cs.endText();
 
-            // Número de remito
+            // 3. Número de remito (Debajo del título)
             cs.beginText();
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 14);
-            cs.newLineAtOffset(w / 2 - 20, y - 55);
+            cs.setFont(PDType1Font.HELVETICA_BOLD, 12);
+            cs.newLineAtOffset(w / 2f - 20, currentY - 55);
             cs.showText("N° " + remito.getNumero());
             cs.endText();
 
-            // Fecha alineada a la derecha
+            // 4. Fecha (Alineada a la derecha)
             String fecha = remito.getFecha() != null
                     ? remito.getFecha().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                     : LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
             cs.beginText();
             cs.setFont(PDType1Font.HELVETICA, 10);
-            cs.newLineAtOffset(w - margin - 80, y - 30);
+            cs.newLineAtOffset(w - margin - 90, currentY - 30);
             cs.showText("Fecha: " + fecha);
             cs.endText();
 
-            // Línea separadora después del header
-            y -= 80;
-            cs.setLineWidth(1f);
-            cs.moveTo(x, y);
-            cs.lineTo(w - margin, y);
+            // --- LÍNEA DE SEPARACIÓN SUPERIOR ---
+            currentY -= 75;
+            cs.setLineWidth(1.2f);
+            cs.moveTo(x, currentY);
+            cs.lineTo(w - margin, currentY);
             cs.stroke();
 
-            // SECCIÓN DATOS DEL CLIENTE - Estilo tabla
-            y -= 30;
+            // --- DATOS DE LA EMPRESA (Debajo de la línea, antes de los datos del cliente) ---
+            currentY -= 20;
+            Configuracion config = configuracionService.getConfiguracion();
+            
+            cs.beginText();
+            cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
+            cs.newLineAtOffset(x, currentY);
+            cs.showText(config.getNombreEmpresa() != null ? config.getNombreEmpresa() : "Agro-Ferretería");
+            cs.endText();
+
+            currentY -= 14;
+            cs.beginText();
+            cs.setFont(PDType1Font.HELVETICA, 9);
+            cs.newLineAtOffset(x, currentY);
+            cs.showText("CUIL: " + (config.getCuit() != null ? config.getCuit() : "—"));
+            cs.endText();
+
+            currentY -= 12;
+            cs.beginText();
+            cs.setFont(PDType1Font.HELVETICA, 9);
+            cs.newLineAtOffset(x, currentY);
+            cs.showText("Dirección: " + (config.getDireccion() != null ? config.getDireccion() : "—"));
+            cs.endText();
+
+            // --- LÍNEA DE SEPARACIÓN PARA SECCIÓN CLIENTE ---
+            currentY -= 15;
+            cs.setLineWidth(0.5f);
+            cs.moveTo(x, currentY);
+            cs.lineTo(w - margin, currentY);
+            cs.stroke();
+
+            // --- SECCIÓN: DATOS DEL CLIENTE ---
+            currentY -= 20;
             cs.beginText();
             cs.setFont(PDType1Font.HELVETICA_BOLD, 12);
-            cs.newLineAtOffset(x, y);
+            cs.newLineAtOffset(x, currentY);
             cs.showText("DATOS DEL CLIENTE");
             cs.endText();
 
-            // Información del cliente en formato de tabla limpia
+            // Sincronizar 'y' y establecer inicio de tabla de info
+            y = currentY;
             float infoStartY = y - 25;
             String[][] clienteData = {
                     { "Nombre:", safeString(remito.getClienteNombre()) },
@@ -342,6 +383,9 @@ public class RemitoService {
             // Columnas
             float colCantX = x + 10;
             float colDescX = x + 80;
+            boolean showPrices = (Remito.EstadoRemito.VALORIZADO.equals(remito.getEstado()) || Remito.EstadoRemito.COBRADO.equals(remito.getEstado())) && remito.getTotal() != null;
+            float colPreX = w - margin - 150;
+            float colSubX = w - margin - 70;
 
             // Títulos de columnas
             cs.beginText();
@@ -355,6 +399,20 @@ public class RemitoService {
             cs.newLineAtOffset(colDescX, tableTop - 15);
             cs.showText("DESCRIPCIÓN");
             cs.endText();
+
+            if (showPrices) {
+                cs.beginText();
+                cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
+                cs.newLineAtOffset(colPreX, tableTop - 15);
+                cs.showText("P. UNIT.");
+                cs.endText();
+
+                cs.beginText();
+                cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
+                cs.newLineAtOffset(colSubX, tableTop - 15);
+                cs.showText("SUBTOTAL");
+                cs.endText();
+            }
 
             // Filas de items
             float rowY = tableTop - 30;
@@ -382,6 +440,21 @@ public class RemitoService {
                     cs.newLineAtOffset(colDescX, rowY - 15);
                     cs.showText(desc);
                     cs.endText();
+
+                    if (showPrices && it.getPrecioUnitario() != null) {
+                        cs.beginText();
+                        cs.setFont(PDType1Font.HELVETICA, 10);
+                        cs.newLineAtOffset(colPreX, rowY - 15);
+                        cs.showText("$" + new java.text.DecimalFormat("#,##0.00").format(it.getPrecioUnitario()));
+                        cs.endText();
+
+                        cs.beginText();
+                        cs.setFont(PDType1Font.HELVETICA, 10);
+                        cs.newLineAtOffset(colSubX, rowY - 15);
+                        java.math.BigDecimal subtotal = it.getCantidad().multiply(it.getPrecioUnitario());
+                        cs.showText("$" + new java.text.DecimalFormat("#,##0.00").format(subtotal));
+                        cs.endText();
+                    }
 
                     rowY -= 22;
 
@@ -435,12 +508,16 @@ public class RemitoService {
             cs.lineTo(w - margin, bottomY);
             cs.stroke();
 
-            // Total a pagar - diseño simple
+            // Total a pagar
             bottomY -= 25;
             cs.beginText();
             cs.setFont(PDType1Font.HELVETICA_BOLD, 11);
             cs.newLineAtOffset(x, bottomY);
-            cs.showText("TOTAL A PAGAR: $ ___________________");
+            if (showPrices) {
+                cs.showText("TOTAL A PAGAR: $" + new java.text.DecimalFormat("#,##0.00").format(remito.getTotal()));
+            } else {
+                cs.showText("TOTAL A PAGAR: $ ___________________");
+            }
             cs.endText();
 
             // Firma - alineada a la derecha

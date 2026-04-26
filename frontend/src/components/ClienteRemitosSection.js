@@ -78,6 +78,8 @@ export default function ClienteRemitosSection({ clienteId }) {
                                                             <tr>
                                                                 <th>Producto</th>
                                                                 <th style={{ textAlign: "center" }}>Cantidad</th>
+                                                                {(r.estado === "VALORIZADO" || r.estado === "COBRADO") && <th style={{ textAlign: "right" }}>Precio Unit.</th>}
+                                                                {(r.estado === "VALORIZADO" || r.estado === "COBRADO") && <th style={{ textAlign: "right" }}>Subtotal</th>}
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -85,6 +87,8 @@ export default function ClienteRemitosSection({ clienteId }) {
                                                                 <tr key={idx}>
                                                                     <td>{it.producto?.nombre || "Producto desconocido"}</td>
                                                                     <td style={{ textAlign: "center" }}>{it.cantidad}</td>
+                                                                    {(r.estado === "VALORIZADO" || r.estado === "COBRADO") && <td style={{ textAlign: "right" }}>{it.precioUnitario ? `$${it.precioUnitario.toLocaleString()}` : "-"}</td>}
+                                                                    {(r.estado === "VALORIZADO" || r.estado === "COBRADO") && <td style={{ textAlign: "right" }}>{it.precioUnitario ? `$${(it.cantidad * it.precioUnitario).toLocaleString()}` : "-"}</td>}
                                                                 </tr>
                                                             ))}
                                                         </tbody>

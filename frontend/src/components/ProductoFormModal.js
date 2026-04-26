@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "../index.css";
 
-export default function ProductoFormModal({ producto, onClose, onSave }) {
+export default function ProductoFormModal({ producto, onClose, onSave, cotizacion }) {
     const [form, setForm] = useState({
         sku: "",
         nombre: "",
@@ -13,7 +13,9 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
         stock: "",
         unidadMedida: "",
         activo: true,
-        fechaVencimiento: "", // ← NUEVO CAMPO
+        fechaVencimiento: "",
+        porcentajeIva: 0,
+        porcentajeUtilidad: 0,
     });
     const formatDate = (iso) => {
         if (!iso) return "";
@@ -21,19 +23,44 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
     };
 
     useEffect(() => {
+        const rate = parseFloat(cotizacion) || 0;
         if (producto) {
+            let pCosto = producto.precioCosto?.toString() || "";
+            let pCostoUSD = producto.precioCostoUSD?.toString() || "";
+
+            // Si el producto tiene costo USD pero no ARS, lo calculamos al cargar
+            if ((!pCosto || pCosto === "0") && pCostoUSD && rate > 0) {
+                pCosto = (parseFloat(pCostoUSD) * rate).toFixed(2);
+            }
+
+            let pVenta = producto.precioVenta?.toString() || "";
+            let pVentaUSD = producto.precioVentaUSD?.toString() || "";
+
+            const iva = producto.porcentajeIva || 0;
+            const util = producto.porcentajeUtilidad || 0;
+
+            // Si los precios de venta son 0 o faltan, calculamos los sugeridos
+            if ((!pVenta || pVenta === "0") && parseFloat(pCosto) > 0) {
+                pVenta = (parseFloat(pCosto) * (1 + iva / 100) * (1 + util / 100)).toFixed(2);
+            }
+            if ((!pVentaUSD || pVentaUSD === "0") && parseFloat(pCostoUSD) > 0) {
+                pVentaUSD = (parseFloat(pCostoUSD) * (1 + iva / 100) * (1 + util / 100)).toFixed(2);
+            }
+
             setForm({
                 sku: producto.sku || "",
                 nombre: producto.nombre || "",
                 descripcion: producto.descripcion || "",
-                precioCosto: producto.precioCosto?.toString() || "",
-                precioVenta: producto.precioVenta?.toString() || "",
-                precioCostoUSD: producto.precioCostoUSD?.toString() || "",
-                precioVentaUSD: producto.precioVentaUSD?.toString() || "",
-                stock: producto.stock ? Math.floor(producto.stock).toString() : "", // ✅ Redondear a entero
+                precioCosto: pCosto,
+                precioVenta: pVenta,
+                precioCostoUSD: pCostoUSD,
+                precioVentaUSD: pVentaUSD,
+                stock: producto.stock ? Math.floor(producto.stock).toString() : "",
                 unidadMedida: producto.unidadMedida || "",
                 activo: producto.activo ?? true,
                 fechaVencimiento: formatDate(producto.fechaVencimiento),
+                porcentajeIva: iva,
+                porcentajeUtilidad: util,
             });
         } else {
             setForm({
@@ -47,19 +74,60 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
                 stock: "",
                 unidadMedida: "",
                 activo: true,
-                fechaVencimiento: "", // ← RESETEO FECHA
+                fechaVencimiento: "",
+                porcentajeIva: 0,
+                porcentajeUtilidad: 0,
             });
         }
     }, [producto]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
-        const val = type === "checkbox" ? checked : value;
+        const val = type === "checkbox" ? checked : value.replace(",", "."); // Robustez con comas
+        const rate = parseFloat(cotizacion) || 0;
 
-        setForm((prev) => ({
-            ...prev,
-            [name]: val,
-        }));
+        setForm((prev) => {
+            const next = { ...prev, [name]: val };
+
+            // 1. Sincronización de Costos entre USD y ARS
+            if (name === "precioCostoUSD" && rate > 0) {
+                const calculatedARS = parseFloat(val) * rate;
+                next.precioCosto = calculatedARS > 0 ? calculatedARS.toFixed(2) : "";
+            } else if (name === "precioCosto" && rate > 0) {
+                const calculatedUSD = parseFloat(val) / rate;
+                next.precioCostoUSD = calculatedUSD > 0 ? calculatedUSD.toFixed(2) : "";
+            }
+
+            // 2. Recálculo de Precios de Venta basado en Costo, IVA y Utilidad
+            // Watchers: precioCosto, precioCostoUSD (ya sincronizados arriba), porcentajeIva, porcentajeUtilidad
+            if (["precioCosto", "precioCostoUSD", "porcentajeIva", "porcentajeUtilidad"].includes(name)) {
+                const costARS = parseFloat(next.precioCosto) || 0;
+                const costUSD = parseFloat(next.precioCostoUSD) || 0;
+                const iva = parseFloat(next.porcentajeIva) || 0;
+                const util = parseFloat(next.porcentajeUtilidad) || 0;
+
+                // Cálculo ARS
+                const costWithIvaARS = costARS * (1 + iva / 100);
+                next.precioVenta = costWithIvaARS > 0 ? (costWithIvaARS * (1 + util / 100)).toFixed(2) : "";
+
+                // Cálculo USD
+                if (costUSD > 0) {
+                    const costWithIvaUSD = costUSD * (1 + iva / 100);
+                    next.precioVentaUSD = (costWithIvaUSD * (1 + util / 100)).toFixed(2);
+                } else {
+                    next.precioVentaUSD = "";
+                }
+            }
+
+            // 3. Sincronización manual de Precios de Venta (si el usuario edita la venta directamente)
+            if (name === "precioVentaUSD" && rate > 0) {
+                next.precioVenta = (parseFloat(val) * rate).toFixed(2);
+            } else if (name === "precioVenta" && rate > 0) {
+                next.precioVentaUSD = (parseFloat(val) / rate).toFixed(2);
+            }
+
+            return next;
+        });
     };
 
     const handleSubmit = (e) => {
@@ -73,7 +141,8 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
             precioVentaUSD: form.precioVentaUSD ? parseFloat(form.precioVentaUSD) : null,
             stock: form.stock ? parseInt(form.stock, 10) : 0, // ✅ Cambiar a parseInt para enteros
             fechaVencimiento: form.fechaVencimiento ? form.fechaVencimiento : null,
-
+            porcentajeIva: parseFloat(form.porcentajeIva) || 0,
+            porcentajeUtilidad: parseFloat(form.porcentajeUtilidad) || 0,
         };
 
         if (producto?.id) {
@@ -95,6 +164,7 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
                     <div className="modal-content">
                         <div className="form-grid">
 
+                            {/* SECCIÓN 1: INFORMACIÓN BÁSICA */}
                             <div className="form-group">
                                 <label className="form-label">SKU *</label>
                                 <input
@@ -124,78 +194,139 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
                                     value={form.descripcion}
                                     onChange={handleChange}
                                     className="modern-textarea"
-                                    rows="3"
+                                    rows="2"
                                 />
                             </div>
 
-                            <div className="form-group">
-                                <label className="form-label">Precio Costo ($ARS)</label>
+                            {/* SECCIÓN 2: VALORES EN PESOS ($ARS) */}
+                            <div className="form-section">
+                                <div className="form-section-title"> Valores en Pesos ($ARS)</div>
+                                <div className="form-grid-inner">
+                                    <div className="form-group">
+                                        <label className="form-label">Costo Neto (ARS)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            name="precioCosto"
+                                            value={form.precioCosto}
+                                            onChange={handleChange}
+                                            onWheel={(e) => e.target.blur()}
+                                            className="modern-input"
+                                            placeholder="Sin IVA"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Costo Real (+IVA)</label>
+                                        <input
+                                            type="text"
+                                            value={`$ ${( (parseFloat(form.precioCosto) || 0) * (1 + (parseFloat(form.porcentajeIva) || 0) / 100) ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                            className="modern-input"
+                                            disabled
+                                            style={{ background: "#f0f9ff", color: "#0369a1", fontWeight: "700", border: "1px solid #bae6fd" }}
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">% IVA</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            name="porcentajeIva"
+                                            value={form.porcentajeIva}
+                                            onChange={handleChange}
+                                            onWheel={(e) => e.target.blur()}
+                                            className="modern-input"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">% Utilidad Sugerida</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            name="porcentajeUtilidad"
+                                            value={form.porcentajeUtilidad}
+                                            onChange={handleChange}
+                                            onWheel={(e) => e.target.blur()}
+                                            className="modern-input"
+                                        />
+                                    </div>
+
+                                    <div className="form-group full-width">
+                                        <label className="form-label" style={{ color: "#16a34a", fontWeight: "700" }}>Precio de Venta Sugerido ($ARS)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            name="precioVenta"
+                                            value={form.precioVenta}
+                                            onChange={handleChange}
+                                            onWheel={(e) => e.target.blur()}
+                                            className="modern-input"
+                                            style={{ borderColor: "#16a34a", background: "#f0fdf4", fontWeight: "700" }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECCIÓN 3: VALORES EN DÓLARES (USD) */}
+                            <div className="form-section" style={{ background: "#fffbeb", borderColor: "#fef3c7" }}>
+                                <div className="form-section-title" style={{ color: "#92400e", borderColor: "#fde68a" }}> Valores en Dólares (USD)</div>
+                                <div className="form-grid-inner">
+                                    <div className="form-group">
+                                        <label className="form-label">Costo USD Neto</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            name="precioCostoUSD"
+                                            value={form.precioCostoUSD}
+                                            onChange={handleChange}
+                                            onWheel={(e) => e.target.blur()}
+                                            className="modern-input"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Costo Real USD (+IVA)</label>
+                                        <input
+                                            type="text"
+                                            value={`USD ${( (parseFloat(form.precioCostoUSD) || 0) * (1 + (parseFloat(form.porcentajeIva) || 0) / 100) ).toFixed(2)}`}
+                                            className="modern-input"
+                                            disabled
+                                            style={{ background: "#fffcf0", color: "#92400e", fontWeight: "700", border: "1px solid #fde68a" }}
+                                        />
+                                    </div>
+
+                                    <div className="form-group full-width">
+                                        <label className="form-label">Precio de Venta USD</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            name="precioVentaUSD"
+                                            value={form.precioVentaUSD}
+                                            onChange={handleChange}
+                                            onWheel={(e) => e.target.blur()}
+                                            className="modern-input"
+                                            style={{ borderColor: "#d97706", fontWeight: "600" }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECCIÓN 4: INVENTARIO */}
+                            <div className="form-group grid-span-1">
+                                <label className="form-label">Stock Actual</label>
                                 <input
-                                    type="number"
-                                    step="0.01"
-                                    name="precioCosto"
-                                    value={form.precioCosto}
-                                    onChange={handleChange}
-                                    onWheel={(e) => e.target.blur()}
                                     className="modern-input"
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Costo USD <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 400 }}>Opcional</span></label>
-                                <input
                                     type="number"
-                                    step="0.01"
-                                    min="0"
-                                    name="precioCostoUSD"
-                                    value={form.precioCostoUSD}
-                                    onChange={handleChange}
-                                    onWheel={(e) => e.target.blur()}
-                                    className="modern-input"
-                                    placeholder="Ej: 5.00"
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Precio Venta ($ARS)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    name="precioVenta"
-                                    value={form.precioVenta}
-                                    onChange={handleChange}
-                                    onWheel={(e) => e.target.blur()}
-                                    className="modern-input"
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Venta USD <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 400 }}>Opcional</span></label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    name="precioVentaUSD"
-                                    value={form.precioVentaUSD}
-                                    onChange={handleChange}
-                                    onWheel={(e) => e.target.blur()}
-                                    className="modern-input"
-                                    placeholder="Ej: 12.50"
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Stock (unidades)</label>
-                                <input
-                                    type="number"
-                                    step="1"
-                                    min="0"
                                     name="stock"
                                     value={form.stock}
                                     onChange={handleChange}
-                                    onWheel={(e) => e.target.blur()}
-                                    className="modern-input"
-                                    placeholder="Ej: 100"
+                                    placeholder="0"
+                                    readOnly
+                                    style={{ backgroundColor: "#f0f0f0", cursor: "not-allowed", border: "1px dashed #ccc" }}
+                                    title="El stock se actualiza automáticamente. Use la función de Ajuste si necesita corregirlo."
                                 />
                             </div>
 
@@ -206,13 +337,12 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
                                     value={form.unidadMedida}
                                     onChange={handleChange}
                                     className="modern-input"
-                                    placeholder="Ej: unidades, kg, litros"
+                                    placeholder="unidades, bidón, etc."
                                 />
                             </div>
 
-                            {/* CAMPO FECHA DE VENCIMIENTO */}
                             <div className="form-group">
-                                <label className="form-label">Fecha de Vencimiento</label>
+                                <label className="form-label">Vencimiento</label>
                                 <input
                                     type="date"
                                     name="fechaVencimiento"
@@ -222,7 +352,7 @@ export default function ProductoFormModal({ producto, onClose, onSave }) {
                                 />
                             </div>
 
-                            <div className="form-group full-width">
+                            <div className="form-group" style={{ justifyContent: "center" }}>
                                 <label className="checkbox-label">
                                     <input
                                         type="checkbox"

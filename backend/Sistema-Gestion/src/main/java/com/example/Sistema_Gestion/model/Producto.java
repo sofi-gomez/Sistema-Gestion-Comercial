@@ -46,7 +46,29 @@ public class Producto {
     @Column(name = "fecha_vencimiento")
     private LocalDate fechaVencimiento;
 
+    @Column(name = "porcentaje_iva", precision = 10, scale = 2)
+    private BigDecimal porcentajeIva = BigDecimal.ZERO;
+
+    @Column(name = "porcentaje_utilidad", precision = 10, scale = 2)
+    private BigDecimal porcentajeUtilidad = BigDecimal.ZERO;
+
     // =================== GETTERS Y SETTERS ===================
+
+    public BigDecimal getPorcentajeIva() {
+        return porcentajeIva;
+    }
+
+    public void setPorcentajeIva(BigDecimal porcentajeIva) {
+        this.porcentajeIva = porcentajeIva;
+    }
+
+    public BigDecimal getPorcentajeUtilidad() {
+        return porcentajeUtilidad;
+    }
+
+    public void setPorcentajeUtilidad(BigDecimal porcentajeUtilidad) {
+        this.porcentajeUtilidad = porcentajeUtilidad;
+    }
 
     public Long getId() {
         return id;

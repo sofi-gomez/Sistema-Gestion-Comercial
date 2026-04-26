@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FiDollarSign, FiCreditCard, FiHash, FiUser, FiDownload } from "react-icons/fi";
+import { FiDollarSign, FiCreditCard, FiHash, FiUser, FiPlus, FiTrash2 } from "react-icons/fi";
 import CamposCheque from "./CamposCheque";
 import { apiFetch } from "../utils/api";
 
@@ -9,19 +9,21 @@ const API_COBROS = "/api/cobros";
 export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected = null, montoSugerido = "", remitoId = null }) {
     const [clientes, setClientes] = useState([]);
     const [clienteId, setClienteId] = useState(clienteIdPreselected || "");
-    const [monto, setMonto] = useState(montoSugerido || "");
-    const [medioPago, setMedioPago] = useState("EFECTIVO");
     const [observaciones, setObservaciones] = useState("");
     const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
     const [loading, setLoading] = useState(false);
 
-    // Campos de cheque
-    const [banco, setBanco] = useState("");
-    const [numeroCheque, setNumeroCheque] = useState("");
-    const [librador, setLibrador] = useState("");
-    const [fechaEmision, setFechaEmision] = useState("");
-    const [fechaCobro, setFechaCobro] = useState("");
-    const [fechaVencimiento, setFechaVencimiento] = useState("");
+    // Lista de pagos (dinámica)
+    const [pagos, setPagos] = useState([{
+        id: Date.now(),
+        medio: "EFECTIVO",
+        importe: montoSugerido || "",
+        banco: "",
+        numeroCheque: "",
+        librador: "",
+        fechaEmision: "",
+        fechaCobro: ""
+    }]);
 
     useEffect(() => {
         if (!clienteIdPreselected) {
@@ -31,6 +33,32 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                 .catch(err => console.error("Error cargando clientes:", err));
         }
     }, [clienteIdPreselected]);
+
+    const totalIngresado = pagos.reduce((acc, p) => acc + (parseFloat(p.importe) || 0), 0);
+    const montoPendiente = parseFloat(montoSugerido || 0) - totalIngresado;
+
+    const addPago = () => {
+        setPagos([...pagos, {
+            id: Date.now(),
+            medio: "EFECTIVO",
+            importe: montoPendiente > 0 ? montoPendiente.toFixed(2) : "",
+            banco: "",
+            numeroCheque: "",
+            librador: "",
+            fechaEmision: "",
+            fechaCobro: ""
+        }]);
+    };
+
+    const removePago = (id) => {
+        if (pagos.length > 1) {
+            setPagos(pagos.filter(p => p.id !== id));
+        }
+    };
+
+    const updatePago = (id, field, value) => {
+        setPagos(pagos.map(p => p.id === id ? { ...p, [field]: value } : p));
+    };
 
     const downloadRecibo = async (cobroId) => {
         try {
@@ -46,23 +74,28 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                 a.remove();
                 window.URL.revokeObjectURL(url);
             }
-        } catch (e) {
-            console.error("Error descargando recibo:", e);
-        }
+        } catch (e) { console.error("Error descargando recibo:", e); }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!clienteId || !monto || parseFloat(monto) <= 0) {
-            alert("Por favor complete el cliente y un monto válido.");
+        if (!clienteId) {
+            alert("Por favor seleccione un cliente.");
             return;
         }
 
-        const medioPagoCheque = medioPago.includes("CHEQUE");
-        if (medioPagoCheque) {
-            if (!banco || !numeroCheque || !fechaEmision || !fechaCobro) {
-                alert("Por favor complete todos los campos obligatorios del cheque (Banco, Número, Emisión y Fecha de Cobro).");
-                return;
+        if (totalIngresado <= 0) {
+            alert("El monto total debe ser mayor a 0.");
+            return;
+        }
+
+        // Validar cheques
+        for (const p of pagos) {
+            if (p.medio.includes("CHEQUE")) {
+                if (!p.banco || !p.numeroCheque || !p.fechaEmision || !p.fechaCobro) {
+                    alert("Por favor complete todos los datos del cheque.");
+                    return;
+                }
             }
         }
 
@@ -71,24 +104,20 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
             const payload = {
                 cobro: {
                     cliente: { id: parseInt(clienteId) },
-                    totalCobrado: parseFloat(monto),
+                    totalCobrado: totalIngresado,
                     fecha: fecha,
-                    observaciones: observaciones.trim() || `Cobro en ${medioPago.toLowerCase()}`
+                    observaciones: observaciones.trim()
                 },
-                importesPorRemito: remitoId ? { [remitoId]: parseFloat(monto) } : {},
-                mediosPago: [
-                    {
-                        medio: medioPago,
-                        importe: parseFloat(monto),
-                        // Datos de cheque si corresponde
-                        banco: medioPago.includes("CHEQUE") ? banco : null,
-                        numeroCheque: medioPago.includes("CHEQUE") ? numeroCheque : null,
-                        librador: medioPago.includes("CHEQUE") ? librador : null,
-                        fechaEmision: medioPago.includes("CHEQUE") ? fechaEmision : null,
-                        fechaCobro: medioPago.includes("CHEQUE") ? fechaCobro : null,
-                        fechaVencimiento: medioPago.includes("CHEQUE") ? (fechaVencimiento || null) : null
-                    }
-                ]
+                importesPorRemito: remitoId ? { [remitoId]: totalIngresado } : {},
+                mediosPago: pagos.map(p => ({
+                    medio: p.medio,
+                    importe: parseFloat(p.importe),
+                    banco: p.medio.includes("CHEQUE") ? p.banco : null,
+                    numeroCheque: p.medio.includes("CHEQUE") ? p.numeroCheque : null,
+                    librador: p.medio.includes("CHEQUE") ? p.librador : null,
+                    fechaEmision: p.medio.includes("CHEQUE") ? p.fechaEmision : null,
+                    fechaCobro: p.medio.includes("CHEQUE") ? p.fechaCobro : null
+                }))
             };
 
             const res = await apiFetch(API_COBROS, {
@@ -98,42 +127,39 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
 
             if (res.ok) {
                 const savedCobro = await res.json();
-                if (window.confirm("¡Cobro registrado con éxito! ¿Deseas descargar el recibo de cobro ahora?")) {
+                if (window.confirm("¡Cobro registrado con éxito! ¿Deseas descargar el recibo ahora?")) {
                     await downloadRecibo(savedCobro.id);
                 }
                 onSaved();
             } else {
                 const errData = await res.json();
-                alert("Error al registrar el cobro: " + (errData.error || "Error desconocido"));
+                alert("Error: " + (errData.error || "Fallo en el servidor"));
             }
         } catch (err) {
             console.error(err);
-            alert("Error de conexión al registrar cobro.");
+            alert("Error de conexión.");
         } finally {
             setLoading(false);
         }
     };
 
-    const esCheque = medioPago.includes("CHEQUE");
-
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: "500px" }}>
+            <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: "700px" }}>
                 <div className="modal-header">
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                         <div className="title-icon" style={{ padding: "8px", background: "#ecfdf5", color: "#10b981" }}>
                             <FiDollarSign />
                         </div>
-                        <h2>Registrar Cobro</h2>
+                        <h2>Registrar Cobro Multimedio</h2>
                     </div>
                     <button onClick={onClose} className="modal-close">×</button>
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <div className="modal-content">
-                        <div className="form-grid" style={{ gridTemplateColumns: "1fr" }}>
-
-                            {/* Selector de Cliente (si no está preseleccionado) */}
+                    <div className="modal-content" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                        {/* Datos Generales */}
+                        <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
                             {!clienteIdPreselected && (
                                 <div className="form-group">
                                     <label className="form-label"><FiUser /> Cliente *</label>
@@ -150,88 +176,134 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                                     </select>
                                 </div>
                             )}
-
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                                <div className="form-group">
-                                    <label className="form-label"><FiDollarSign /> Monto a Cobrar *</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        className="modern-input"
-                                        value={monto}
-                                        onChange={e => setMonto(e.target.value)}
-                                        onWheel={(e) => e.target.blur()}
-                                        placeholder="0.00"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label"><FiCreditCard /> Medio de Pago *</label>
-                                    <select
-                                        className="modern-select"
-                                        value={medioPago}
-                                        onChange={e => setMedioPago(e.target.value)}
-                                        required
-                                    >
-                                        <option value="EFECTIVO">Efectivo</option>
-                                        <option value="TRANSFERENCIA">Transferencia</option>
-                                        <option value="CHEQUE">Cheque</option>
-                                        <option value="CHEQUE_ELECTRONICO">Cheque Electrónico</option>
-                                        <option value="MERCADO_PAGO">Mercado Pago</option>
-                                    </select>
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label"><FiCreditCard /> Fecha del Cobro *</label>
-                                    <input
-                                        type="date"
-                                        className="modern-input"
-                                        value={fecha}
-                                        onChange={e => setFecha(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            {esCheque && (
-                                <div className="cheque-fields-container" style={{ background: "#f8fafc", padding: "1rem", borderRadius: "12px", border: "1px solid var(--border)" }}>
-                                    <h4 style={{ marginBottom: "1rem", fontSize: "0.9rem", color: "var(--primary)" }}>Datos del Cheque</h4>
-                                    <CamposCheque
-                                        mostrar={true}
-                                        banco={banco}
-                                        setBanco={setBanco}
-                                        numeroCheque={numeroCheque}
-                                        setNumeroCheque={setNumeroCheque}
-                                        librador={librador}
-                                        setLibrador={setLibrador}
-                                        fechaEmision={fechaEmision}
-                                        setFechaEmision={setFechaEmision}
-                                        fechaCobro={fechaCobro}
-                                        setFechaCobro={setFechaCobro}
-                                    />
-                                </div>
-                            )}
-
                             <div className="form-group">
-                                <label className="form-label"><FiHash /> Observaciones</label>
-                                <textarea
-                                    className="modern-textarea"
-                                    value={observaciones}
-                                    onChange={e => setObservaciones(e.target.value)}
-                                    placeholder="Opcional: Detalle del pago..."
-                                    rows="2"
+                                <label className="form-label"><FiCreditCard /> Fecha *</label>
+                                <input
+                                    type="date"
+                                    className="modern-input"
+                                    value={fecha}
+                                    onChange={e => setFecha(e.target.value)}
+                                    required
                                 />
                             </div>
                         </div>
+
+                        {/* Listado de Pagos */}
+                        <div className="pagos-container">
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                                <h3 style={{ fontSize: "1rem", color: "#1e293b", fontWeight: "600" }}>Medios de Pago</h3>
+                                <button type="button" className="btn-modern" onClick={addPago} style={{ padding: "6px 12px", background: "#dcfce7", color: "#166534", border: "1px solid #bbf7d0", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "5px" }}>
+                                    <FiPlus /> Agregar Medio
+                                </button>
+                            </div>
+
+                            {pagos.map((p, index) => (
+                                <div key={p.id} className="pago-item" style={{ 
+                                    background: "#f8fafc", 
+                                    padding: "1rem", 
+                                    borderRadius: "12px", 
+                                    border: "1px solid #e2e8f0",
+                                    marginBottom: "1rem",
+                                    position: "relative"
+                                }}>
+                                    {pagos.length > 1 && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => removePago(p.id)}
+                                            style={{ position: "absolute", top: "10px", right: "10px", color: "#ef4444", background: "none", border: "none", cursor: "pointer", fontSize: "1.2rem" }}
+                                            title="Eliminar medio"
+                                        >
+                                            <FiTrash2 />
+                                        </button>
+                                    )}
+
+                                    <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                                        <div className="form-group">
+                                            <label className="form-label">Medio de Pago</label>
+                                            <select
+                                                className="modern-select"
+                                                value={p.medio}
+                                                onChange={e => updatePago(p.id, "medio", e.target.value)}
+                                                required
+                                            >
+                                                <option value="EFECTIVO">Efectivo</option>
+                                                <option value="TRANSFERENCIA">Transferencia</option>
+                                                <option value="CHEQUE">Cheque</option>
+                                                <option value="CHEQUE_ELECTRONICO">Cheque Electrónico</option>
+                                                <option value="MERCADO_PAGO">Mercado Pago</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Importe *</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                className="modern-input"
+                                                value={p.importe}
+                                                onChange={e => updatePago(p.id, "importe", e.target.value)}
+                                                placeholder="0.00"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {p.medio.includes("CHEQUE") && (
+                                        <div style={{ marginTop: "1rem", borderTop: "1px dashed #cbd5e1", paddingTop: "1rem" }}>
+                                            <CamposCheque
+                                                mostrar={true}
+                                                banco={p.banco}
+                                                setBanco={v => updatePago(p.id, "banco", v)}
+                                                numeroCheque={p.numeroCheque}
+                                                setNumeroCheque={v => updatePago(p.id, "numeroCheque", v)}
+                                                librador={p.librador}
+                                                setLibrador={v => updatePago(p.id, "librador", v)}
+                                                fechaEmision={p.fechaEmision}
+                                                setFechaEmision={v => updatePago(p.id, "fechaEmision", v)}
+                                                fechaCobro={p.fechaCobro}
+                                                setFechaCobro={v => updatePago(p.id, "fechaCobro", v)}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Resumen */}
+                        <div style={{ background: "#f1f5f9", padding: "1.2rem", borderRadius: "12px", marginBottom: "1.5rem", border: "1px solid #e2e8f0" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span style={{ fontWeight: "600", color: "#475569" }}>Total Ingresado:</span>
+                                <span style={{ fontSize: "1.4rem", fontWeight: "bold", color: "#0f172a" }}>
+                                    ${totalIngresado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            {remitoId && (
+                                <div style={{ display: "flex", justifyContent: "space-between", color: Math.abs(montoPendiente) < 0.01 ? "#059669" : "#64748b", fontSize: "0.85rem", marginTop: "8px", borderTop: "1px solid #cbd5e1", paddingTop: "8px" }}>
+                                    <span>Total Remito: ${parseFloat(montoSugerido).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                                    <span style={{ fontWeight: "600" }}>
+                                        {Math.abs(montoPendiente) < 0.01 ? "✓ Saldo cubierto" : (montoPendiente > 0 ? `Faltante: $${montoPendiente.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : `Excedente (a favor): $${Math.abs(montoPendiente).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`)}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label"><FiHash /> Observaciones Generales</label>
+                            <textarea
+                                className="modern-textarea"
+                                value={observaciones}
+                                onChange={e => setObservaciones(e.target.value)}
+                                placeholder="Opcional..."
+                                rows="2"
+                            />
+                        </div>
                     </div>
 
-                    <div className="modal-actions">
+                    <div className="modal-actions" style={{ marginTop: "1rem" }}>
                         <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>
                             Cancelar
                         </button>
-                        <button type="submit" className="btn-primary" disabled={loading} style={{ background: "#10b981" }}>
-                            {loading ? "Registrando..." : "Confirmar Cobro"}
+                        <button type="submit" className="btn-primary" disabled={loading || totalIngresado <= 0} style={{ background: "#10b981", border: "none" }}>
+                            {loading ? "Registrando..." : "Confirmar Cobro Multimedio"}
                         </button>
                     </div>
                 </form>
