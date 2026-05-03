@@ -46,14 +46,40 @@ public class ProveedorService {
     }
 
     public Proveedor guardar(Proveedor proveedor) {
+        // Limpieza de datos
+        if (proveedor.getNombre() != null) proveedor.setNombre(proveedor.getNombre().trim());
+        if (proveedor.getCuit() != null) {
+            String limpio = proveedor.getCuit().replaceAll("[^0-9]", "");
+            proveedor.setCuit(limpio);
+        }
+
+        // Verificación de duplicados
+        if (proveedor.getCuit() != null && !proveedor.getCuit().isEmpty()) {
+            proveedorRepository.findByCuit(proveedor.getCuit()).ifPresent(p -> {
+                throw new RuntimeException("El CUIT '" + proveedor.getCuit() + "' ya existe para el proveedor: " + p.getNombre());
+            });
+        }
+
         return proveedorRepository.save(proveedor);
     }
 
     public Proveedor actualizar(Long id, Proveedor proveedor) {
         Proveedor existente = proveedorRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Proveedor no encontrado"));
-        existente.setNombre(proveedor.getNombre());
-        existente.setCuit(proveedor.getCuit());
+
+        String nuevoCuit = proveedor.getCuit() != null ? proveedor.getCuit().replaceAll("[^0-9]", "") : "";
+
+        // Verificación de duplicado si el CUIT cambió
+        if (!nuevoCuit.isEmpty()) {
+            proveedorRepository.findByCuit(nuevoCuit).ifPresent(p -> {
+                if (!p.getId().equals(id)) {
+                    throw new RuntimeException("No se puede actualizar: El CUIT '" + nuevoCuit + "' ya pertenece a otro proveedor (" + p.getNombre() + ")");
+                }
+            });
+        }
+
+        existente.setNombre(proveedor.getNombre() != null ? proveedor.getNombre().trim() : "");
+        existente.setCuit(nuevoCuit);
         existente.setDireccion(proveedor.getDireccion());
         existente.setTelefono(proveedor.getTelefono());
         existente.setEmail(proveedor.getEmail());

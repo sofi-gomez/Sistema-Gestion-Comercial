@@ -44,7 +44,7 @@ export default function AjusteStockModal({ producto, onClose, onSave }) {
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: "450px" }}>
                 <div className="modal-header">
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>

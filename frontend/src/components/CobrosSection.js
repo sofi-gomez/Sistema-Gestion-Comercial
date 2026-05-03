@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { FiCheckCircle, FiDollarSign, FiTag } from "react-icons/fi";
 import CobroFormModal from "./CobroFormModal";
 import ValorizarSection from "./ValorizarSection";
@@ -13,6 +14,19 @@ export default function CobrosSection({ onUpdate }) {
     const [cobrandoRemito, setCobrandoRemito] = useState(null);
     const [revalorizandoRemito, setRevalorizandoRemito] = useState(null);
     const [expandedRows, setExpandedRows] = useState(new Set());
+    const navigate = useNavigate();
+
+    const handleClientClick = (clienteId) => {
+        if (!clienteId) return;
+        navigate('/clientes', { 
+            state: { 
+                autoOpenClienteId: clienteId, 
+                autoOpenTab: 'remitos',
+                returnTo: '/remitos',
+                returnLabel: 'Ventas y Remitos'
+            } 
+        });
+    };
 
     const toggleRow = (id) => {
         const newExpanded = new Set(expandedRows);
@@ -62,7 +76,15 @@ export default function CobrosSection({ onUpdate }) {
                                 <React.Fragment key={r.id}>
                                     <tr className={expandedRows.has(r.id) ? "expanded-parent" : ""}>
                                         <td className="sku-cell"><span className="sku-badge">#{r.numero}</span></td>
-                                        <td>{r.clienteNombre}</td>
+                                        <td>
+                                            <span 
+                                                onClick={() => handleClientClick(r.cliente?.id)}
+                                                style={{ color: "var(--primary)", cursor: "pointer", textDecoration: "underline", fontWeight: "500" }}
+                                                title="Ver cuenta del cliente"
+                                            >
+                                                {r.clienteNombre}
+                                            </span>
+                                        </td>
                                         <td>
                                             <button
                                                 className="btn-modern secondary"

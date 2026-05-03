@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { FiCheck, FiClock, FiAlertCircle, FiSearch, FiFileText, FiFilter, FiTrendingUp } from "react-icons/fi";
 import { formatDateLocal } from "../utils/dateUtils";
 import { apiFetch } from "../utils/api";
@@ -11,13 +12,52 @@ export default function CarteraChequesSection() {
     const [searchTerm, setSearchTerm] = useState("");
     const [checkFilter, setCheckFilter] = useState("all"); // "all", "cobrados", "listos", "urgentes"
     const [sortOrder, setSortOrder] = useState("desc"); // "asc" o "desc"
+    const navigate = useNavigate();
+
+    const handleRefClick = async (refStr, targetTab = null) => {
+        if (!refStr) return;
+        
+        if (refStr.startsWith("Pago #")) {
+            const pagoId = refStr.replace("Pago #", "");
+            try {
+                const res = await apiFetch(`/api/pagos-proveedor/${pagoId}`);
+                if (res.ok) {
+                    const pago = await res.json();
+                    if (pago && pago.proveedor && pago.proveedor.id) {
+                        navigate('/proveedores', { state: { 
+                            autoOpenProveedorId: pago.proveedor.id, 
+                            autoOpenTab: targetTab || 'ctacte',
+                            returnTo: '/tesoreria',
+                            returnLabel: 'Cheques'
+                        } });
+                    }
+                }
+            } catch (err) { console.error(err); }
+        } else if (refStr.startsWith("Cobro #")) {
+            const cobroId = refStr.replace("Cobro #", "");
+            try {
+                const res = await apiFetch(`/api/cobros/${cobroId}`);
+                if (res.ok) {
+                    const cobro = await res.json();
+                    if (cobro && cobro.cliente && cobro.cliente.id) {
+                        navigate('/clientes', { state: { 
+                            autoOpenClienteId: cobro.cliente.id, 
+                            autoOpenTab: targetTab || 'remitos',
+                            returnTo: '/tesoreria',
+                            returnLabel: 'Cheques'
+                        } });
+                    }
+                }
+            } catch (err) { console.error(err); }
+        }
+    };
 
     const fetchCheques = async () => {
         setLoading(true);
         try {
             const res = await apiFetch(`${API_BASE}`);
             const data = await res.json();
-            // Filtrar solo medios de pago CHEQUE o CHEQUE_ELECTRONICO y que NO estén anulados
+            // Filtrar solo medios de pago CHEQUE o CHEQUE_ELECTRONICO y que NO estén anulados ni RECHAZADOS (o mostrarlos con badge)
             const filtrados = (data || []).filter(m =>
                 (m.medioPago === 'CHEQUE' || m.medioPago === 'CHEQUE_ELECTRONICO') && !m.anulado
             );
@@ -56,6 +96,23 @@ export default function CarteraChequesSection() {
             const res = await apiFetch(`${API_BASE}/${id}/cobrar`, { method: "PUT" });
             if (res.ok) fetchCheques();
         } catch (err) { alert("Error al marcar como cobrado"); }
+    };
+
+    const handleRechazar = async (id) => {
+        const gastos = prompt("¿Desea marcar este cheque como RECHAZADO? Se generará una Nota de Débito automática al cliente.\n\nIngrese gastos bancarios si aplica:", "0");
+        if (gastos === null) return;
+        try {
+            const res = await apiFetch(`${API_BASE}/${id}/rechazar`, { 
+                method: "PUT",
+                body: JSON.stringify({ gastosBancarios: parseFloat(gastos) || 0 })
+            });
+            if (res.ok) {
+                alert("Cheque rechazado con éxito. Se generó la Nota de Débito correspondiente.");
+                fetchCheques();
+            } else {
+                alert("Error al rechazar cheque");
+            }
+        } catch (err) { alert("Error de conexión"); }
     };
 
     const filtered = cheques.filter(c => {
@@ -194,20 +251,37 @@ export default function CarteraChequesSection() {
                                 return (
                                     <tr key={c.id}>
                                         <td>
-                                            <span className={`status-badge ${c.cobrado ? 'active' : vencido ? 'inactive' : 'warning'}`}>
-                                                {c.cobrado ? 'Cobrado' : vencido ? 'Vencido' : 'En Cartera'}
+                                            <span className={`status-badge ${c.rechazado ? 'inactive' : c.cobrado ? 'active' : vencido ? 'inactive' : 'warning'}`}>
+                                                {c.rechazado ? 'RECHAZADO' : c.cobrado ? 'Cobrado' : vencido ? 'Vencido' : 'En Cartera'}
                                             </span>
                                         </td>
                                         <td>{formatDateLocal(c.fechaVencimiento)}</td>
                                         <td>{c.banco || '-'}</td>
                                         <td className="sku-cell"><span className="sku-badge">#{c.numeroCheque || '-'}</span></td>
                                         <td className="price-cell" style={{ fontWeight: 'bold' }}>${c.importe?.toLocaleString()}</td>
-                                        <td>{c.librador || '-'}</td>
                                         <td>
-                                            {!c.cobrado && (
-                                                <button onClick={() => handleCobrar(c.id)} className="btn-secondary" style={{ padding: "4px 8px", fontSize: "0.8rem" }}>
-                                                    <FiCheck /> Cobrar
-                                                </button>
+                                            {c.referencia && !c.anulado ? (
+                                                <span 
+                                                    onClick={() => handleRefClick(c.referencia)}
+                                                    style={{ color: "var(--primary)", textDecoration: "underline", cursor: "pointer", fontWeight: "500" }}
+                                                    title="Ver perfil del cliente / emisor"
+                                                >
+                                                    {c.librador || "-"}
+                                                </span>
+                                            ) : (
+                                                c.librador || "-"
+                                            )}
+                                        </td>
+                                        <td>
+                                            {!c.cobrado && !c.rechazado && (
+                                                <div style={{ display: "flex", gap: "8px" }}>
+                                                    <button onClick={() => handleCobrar(c.id)} className="btn-secondary" style={{ padding: "4px 8px", fontSize: "0.8rem", background: "#10b981", color: "white", border: "none" }}>
+                                                        <FiCheck /> Cobrar
+                                                    </button>
+                                                    <button onClick={() => handleRechazar(c.id)} className="btn-secondary" style={{ padding: "4px 8px", fontSize: "0.8rem", background: "#ef4444", color: "white", border: "none" }}>
+                                                        <FiAlertCircle /> Rechazar
+                                                    </button>
+                                                </div>
                                             )}
                                         </td>
                                     </tr>

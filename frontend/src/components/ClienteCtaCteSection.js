@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiDollarSign, FiTrendingDown, FiCheckCircle, FiFileText, FiPlus, FiExternalLink, FiDownload, FiTrash2 } from "react-icons/fi";
 import CobroFormModal from "./CobroFormModal";
+import NotaFormModal from "./NotaFormModal";
 import { formatDateLocal } from "../utils/dateUtils";
 import { apiFetch } from "../utils/api";
 
@@ -13,7 +14,8 @@ export default function ClienteCtaCteSection({ clienteId }) {
     const [movimientos, setMovimientos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalCobroOpen, setModalCobroOpen] = useState(false);
-    const [sortOrder, setSortOrder] = useState("desc"); // "asc" o "desc"
+    const [modalNotaOpen, setModalNotaOpen] = useState(false);
+    const [sortOrder, setSortOrder] = useState("asc"); // "asc" o "desc"
     const [cotizacionDolar, setCotizacionDolar] = useState(null);
 
     useEffect(() => {
@@ -147,6 +149,13 @@ export default function ClienteCtaCteSection({ clienteId }) {
                     <button className="btn-secondary" onClick={fetchCtaCte} style={{ padding: "6px 12px", fontSize: "0.85rem" }}>Actualizar</button>
                     <button
                         className="btn-primary"
+                        onClick={() => setModalNotaOpen(true)}
+                        style={{ padding: "6px 12px", fontSize: "0.85rem", background: "#f97316", border: "none" }}
+                    >
+                        <FiPlus /> Nueva Nota
+                    </button>
+                    <button
+                        className="btn-primary"
                         onClick={() => setModalCobroOpen(true)}
                         style={{ padding: "6px 12px", fontSize: "0.85rem", background: "#10b981", border: "none" }}
                     >
@@ -193,7 +202,7 @@ export default function ClienteCtaCteSection({ clienteId }) {
                                         $ {m.saldoAcumulado.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </td>
                                     <td style={{ textAlign: "center", width: "200px" }}>
-                                        {m.tipo === "HABER" && (
+                                        {m.origen === "COBRO" && (
                                             <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
                                                 <button
                                                     className="btn-modern secondary"
@@ -254,6 +263,16 @@ export default function ClienteCtaCteSection({ clienteId }) {
                     onClose={() => setModalCobroOpen(false)}
                     onSaved={() => {
                         setModalCobroOpen(false);
+                        fetchCtaCte();
+                    }}
+                />
+            )}
+            {modalNotaOpen && (
+                <NotaFormModal
+                    clienteId={clienteId}
+                    onClose={() => setModalNotaOpen(false)}
+                    onSaved={() => {
+                        setModalNotaOpen(false);
                         fetchCtaCte();
                     }}
                 />

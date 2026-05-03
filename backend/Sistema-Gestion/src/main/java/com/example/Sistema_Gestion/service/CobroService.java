@@ -35,6 +35,9 @@ public class CobroService {
     private final TesoreriaService tesoreriaService;
     private final ClienteRepository clienteRepository;
     private final ConfiguracionService configuracionService;
+    private final NotaRepository notaRepository;
+    private final CobroNotaRepository cobroNotaRepository;
+    private final NotaService notaService;
 
     public CobroService(CobroRepository cobroRepository,
             CobroRemitoRepository cobroRemitoRepository,
@@ -42,7 +45,10 @@ public class CobroService {
             RemitoService remitoService,
             TesoreriaService tesoreriaService,
             ClienteRepository clienteRepository,
-            ConfiguracionService configuracionService) {
+            ConfiguracionService configuracionService,
+            NotaRepository notaRepository,
+            CobroNotaRepository cobroNotaRepository,
+            NotaService notaService) {
         this.cobroRepository = cobroRepository;
         this.cobroRemitoRepository = cobroRemitoRepository;
         this.remitoRepository = remitoRepository;
@@ -50,6 +56,9 @@ public class CobroService {
         this.tesoreriaService = tesoreriaService;
         this.clienteRepository = clienteRepository;
         this.configuracionService = configuracionService;
+        this.notaRepository = notaRepository;
+        this.cobroNotaRepository = cobroNotaRepository;
+        this.notaService = notaService;
     }
 
     /**
@@ -64,15 +73,52 @@ public class CobroService {
     public Cobro registrarCobro(
             Cobro cobro,
             Map<Long, BigDecimal> importesPorRemito,
+            Map<Long, BigDecimal> importesPorNotaDebito,
             List<CobroMedioPago> mediosPago) {
-        // 1. Calcular el total desde los medios de pago (fuente de verdad del dinero recibido)
-        BigDecimal sumaMedios = mediosPago != null ? mediosPago.stream()
+        BigDecimal sumaMediosFisicos = mediosPago != null ? mediosPago.stream()
+                .filter(m -> !"SALDO_A_FAVOR".equals(m.getMedio()))
                 .map(CobroMedioPago::getImporte)
                 .filter(i -> i != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO;
 
-        // El totalCobrado del objeto principal DEBE ser la suma de los medios.
-        cobro.setTotalCobrado(sumaMedios);
+        // Validar saldo a favor si se utiliza
+        if (mediosPago != null && cobro.getCliente() != null && cobro.getCliente().getId() != null) {
+            BigDecimal saldoUsado = mediosPago.stream()
+                    .filter(m -> "SALDO_A_FAVOR".equals(m.getMedio()))
+                    .map(CobroMedioPago::getImporte)
+                    .filter(i -> i != null)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            if (saldoUsado.compareTo(BigDecimal.ZERO) > 0) {
+                // El saldo bruto es la cuenta corriente dinámica (negativo = a favor)
+                BigDecimal saldoBruto = calcularSaldoCliente(cobro.getCliente().getId());
+                
+                // Calculamos el total de deuda (remitos) que se están cubriendo en ESTE pago
+                BigDecimal totalRemitosCobrados = importesPorRemito != null ? importesPorRemito.values().stream()
+                        .filter(i -> i != null)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO;
+
+                BigDecimal totalNotasCobradas = importesPorNotaDebito != null ? importesPorNotaDebito.values().stream()
+                        .filter(i -> i != null)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO;
+                
+                // Al saldo bruto le restamos el total de deudas que se están cubriendo en ESTE pago
+                BigDecimal saldoExcluyendoDeudas = saldoBruto.subtract(totalRemitosCobrados).subtract(totalNotasCobradas);
+                
+                // El disponible es la porción negativa (saldo a favor)
+                BigDecimal saldoDisponible = saldoExcluyendoDeudas.compareTo(BigDecimal.ZERO) < 0 
+                        ? saldoExcluyendoDeudas.abs() 
+                        : BigDecimal.ZERO;
+                        
+                if (saldoUsado.compareTo(saldoDisponible) > 0) {
+                    throw new IllegalArgumentException("Saldo a favor insuficiente. Disponible: " + saldoDisponible);
+                }
+            }
+        }
+
+        // El totalCobrado del objeto principal DEBE ser solo los medios físicos,
+        // para no duplicar ingresos en la Cuenta Corriente general.
+        cobro.setTotalCobrado(sumaMediosFisicos);
 
         if (cobro.getFecha() == null) {
             cobro.setFecha(LocalDate.now());
@@ -94,52 +140,59 @@ public class CobroService {
         Cobro savedCobro = cobroRepository.save(cobro);
 
         // Distribuir el cobro entre los remitos indicados
-        for (Map.Entry<Long, BigDecimal> entry : importesPorRemito.entrySet()) {
-            Long remitoId = entry.getKey();
-            BigDecimal importe = entry.getValue();
+        if (importesPorRemito != null) {
+            for (Map.Entry<Long, BigDecimal> entry : importesPorRemito.entrySet()) {
+                Long remitoId = entry.getKey();
+                BigDecimal importe = entry.getValue();
 
-            Remito remito = remitoRepository.findById(remitoId)
-                    .orElseThrow(() -> new RuntimeException("Remito no encontrado: " + remitoId));
+                Remito remito = remitoRepository.findById(remitoId)
+                        .orElseThrow(() -> new RuntimeException("Remito no encontrado: " + remitoId));
 
-            if (remito.getEstado() != Remito.EstadoRemito.VALORIZADO) {
-                throw new IllegalStateException(
-                        "El remito " + remitoId + " debe estar VALORIZADO para poder cobrarse");
+                if (remito.getEstado() != Remito.EstadoRemito.VALORIZADO) {
+                    throw new IllegalStateException(
+                            "El remito " + remitoId + " debe estar VALORIZADO para poder cobrarse");
+                }
+
+                // Registrar el importe aplicado a este remito
+                CobroRemito cobroRemito = new CobroRemito();
+                cobroRemito.setCobro(savedCobro);
+                cobroRemito.setRemito(remito);
+                cobroRemito.setImporte(importe);
+                savedCobro.getRemitos().add(cobroRemito);
+
+                // Calcular total cobrado acumulado en este remito
+                BigDecimal yaCobradobAntes = cobroRemitoRepository.totalCobradoPorRemito(remitoId);
+                BigDecimal totalCobradoAhora = yaCobradobAntes.add(importe);
+
+                // Actualizar estado del remito si quedó saldado
+                remitoService.actualizarEstadoPostCobro(remito, totalCobradoAhora);
             }
-
-            // Registrar el importe aplicado a este remito
-            CobroRemito cobroRemito = new CobroRemito();
-            cobroRemito.setCobro(savedCobro);
-            cobroRemito.setRemito(remito);
-            cobroRemito.setImporte(importe);
-            savedCobro.getRemitos().add(cobroRemito);
-
-            // Calcular total cobrado acumulado en este remito
-            BigDecimal yaCobradobAntes = cobroRemitoRepository.totalCobradoPorRemito(remitoId);
-            BigDecimal totalCobradoAhora = yaCobradobAntes.add(importe);
-
-            // Actualizar estado del remito si quedó saldado
-            remitoService.actualizarEstadoPostCobro(remito, totalCobradoAhora);
         }
 
-        // AF-09: Calcular excedente y acumularlo como saldo a favor
-        if (!importesPorRemito.isEmpty() && cobro.getCliente() != null && cobro.getCliente().getId() != null) {
-            BigDecimal sumaAplicadaRemitos = importesPorRemito.values().stream()
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Distribuir el cobro entre las notas de débito indicadas
+        if (importesPorNotaDebito != null) {
+            for (Map.Entry<Long, BigDecimal> entry : importesPorNotaDebito.entrySet()) {
+                Long notaId = entry.getKey();
+                BigDecimal importe = entry.getValue();
 
-            // Suma total de los remitos originales (deuda)
-            BigDecimal deudaTotal = importesPorRemito.keySet().stream()
-                    .map(remitoId -> remitoRepository.findById(remitoId)
-                            .map(r -> r.getTotal() != null ? r.getTotal() : BigDecimal.ZERO)
-                            .orElse(BigDecimal.ZERO))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                Nota nota = notaRepository.findById(notaId)
+                        .orElseThrow(() -> new RuntimeException("Nota no encontrada: " + notaId));
 
-            BigDecimal excedente = sumaAplicadaRemitos.subtract(deudaTotal);
-            if (excedente.compareTo(BigDecimal.ZERO) > 0) {
-                clienteRepository.findById(cobro.getCliente().getId()).ifPresent(cliente -> {
-                    BigDecimal actual = cliente.getSaldoAFavor();
-                    cliente.setSaldoAFavor(actual.add(excedente));
-                    clienteRepository.save(cliente);
-                });
+                if (nota.getEstado() != Nota.EstadoNota.PENDIENTE) {
+                    throw new IllegalStateException(
+                            "La nota " + notaId + " debe estar PENDIENTE para poder cobrarse");
+                }
+
+                CobroNota cobroNota = new CobroNota();
+                cobroNota.setCobro(savedCobro);
+                cobroNota.setNota(nota);
+                cobroNota.setImporte(importe);
+                savedCobro.getNotas().add(cobroNota);
+
+                BigDecimal yaCobradoAntes = cobroNotaRepository.totalCobradoPorNota(notaId);
+                BigDecimal totalCobradoAhora = yaCobradoAntes.add(importe);
+
+                notaService.actualizarEstadoPostCobro(nota, totalCobradoAhora);
             }
         }
 
@@ -149,32 +202,37 @@ public class CobroService {
                 medio.setCobro(savedCobro);
                 savedCobro.getMediosPago().add(medio);
 
-                // ✅ Crear Movimiento de Tesorería automáticamente
-                MovimientoTesoreria mov = new MovimientoTesoreria();
-                mov.setTipo("INGRESO");
-                mov.setMedioPago(medio.getMedio()); // El modelo CobroMedioPago usa String para medio
-                mov.setImporte(medio.getImporte());
-                mov.setFecha(savedCobro.getFecha().atStartOfDay());
-                
-                // Simplificar descripción: Solo mostrar observaciones manuales
-                String desc = (medio.getCobro().getObservaciones() != null && !medio.getCobro().getObservaciones().trim().isEmpty())
-                              ? medio.getCobro().getObservaciones().trim()
-                              : "Cobro de Cliente";
-                mov.setDescripcion(desc);
-                
-                mov.setReferencia("Cobro #" + savedCobro.getId());
-                mov.setEntidad(nombreCliente);
+                if ("SALDO_A_FAVOR".equals(medio.getMedio())) {
+                    // No generamos movimiento de tesorería para el saldo virtual.
+                    // Ya validamos y descontamos conceptualmente al no sumarlo al totalCobrado físico.
+                } else {
+                    // ✅ Crear Movimiento de Tesorería automáticamente para medios reales
+                    MovimientoTesoreria mov = new MovimientoTesoreria();
+                    mov.setTipo("INGRESO");
+                    mov.setMedioPago(medio.getMedio()); // El modelo CobroMedioPago usa String para medio
+                    mov.setImporte(medio.getImporte());
+                    mov.setFecha(savedCobro.getFecha().atStartOfDay());
+                    
+                    // Simplificar descripción: Solo mostrar observaciones manuales
+                    String desc = (medio.getCobro().getObservaciones() != null && !medio.getCobro().getObservaciones().trim().isEmpty())
+                                  ? medio.getCobro().getObservaciones().trim()
+                                  : "Cobro de Cliente";
+                    mov.setDescripcion(desc);
+                    
+                    mov.setReferencia("Cobro #" + savedCobro.getId());
+                    mov.setEntidad(nombreCliente);
 
-                // Si es cheque, copiar datos
-                if ("CHEQUE".equals(medio.getMedio()) || "CHEQUE_ELECTRONICO".equals(medio.getMedio())) {
-                    mov.setBanco(medio.getBanco());
-                    mov.setNumeroCheque(medio.getNumeroCheque());
-                    mov.setLibrador(medio.getLibrador());
-                    mov.setFechaEmision(medio.getFechaEmision());
-                    mov.setFechaVencimiento(medio.getFechaVencimiento());
+                    // Si es cheque, copiar datos
+                    if ("CHEQUE".equals(medio.getMedio()) || "CHEQUE_ELECTRONICO".equals(medio.getMedio())) {
+                        mov.setBanco(medio.getBanco());
+                        mov.setNumeroCheque(medio.getNumeroCheque());
+                        mov.setLibrador(medio.getLibrador());
+                        mov.setFechaEmision(medio.getFechaEmision());
+                        mov.setFechaVencimiento(medio.getFechaVencimiento());
+                    }
+
+                    tesoreriaService.registrarMovimiento(mov);
                 }
-
-                tesoreriaService.registrarMovimiento(mov);
             }
         }
 
@@ -192,38 +250,53 @@ public class CobroService {
     public List<MovimientoDto> getMovimientos(Long clienteId) {
         List<MovimientoDto> movimientos = new ArrayList<>();
 
-        // 1. Agregar Remitos valorizados (Debe)
-        List<Remito> remitos = remitoRepository.findByClienteIdAndEstadoOrderByFechaDesc(clienteId,
-                Remito.EstadoRemito.VALORIZADO);
-        remitos.addAll(remitoRepository.findByClienteIdAndEstadoOrderByFechaDesc(clienteId,
-                Remito.EstadoRemito.COBRADO));
-
+        // 1. Agregar Remitos (Debe)
+        List<Remito> remitos = remitoRepository.findByClienteIdAndEstadoOrderByFechaDesc(clienteId, Remito.EstadoRemito.VALORIZADO);
+        remitos.addAll(remitoRepository.findByClienteIdAndEstadoOrderByFechaDesc(clienteId, Remito.EstadoRemito.COBRADO));
         for (Remito r : remitos) {
-            movimientos.add(new MovimientoDto(
-                    r.getFecha(),
-                    "DEBE",
-                    "Remito #" + r.getNumero(),
-                    r.getTotal(),
-                    r.getId()));
+            movimientos.add(new MovimientoDto(r.getFecha(), "DEBE", "REMITO", "Remito #" + r.getNumero(), r.getTotal(), r.getId()));
         }
 
         // 2. Agregar Cobros (Haber)
         List<Cobro> cobros = cobroRepository.findByClienteIdOrderByFechaDesc(clienteId);
         for (Cobro c : cobros) {
             if (!c.getAnulado()) {
-                movimientos.add(new MovimientoDto(
-                        c.getFecha(),
-                        "HABER",
-                        c.getObservaciones() != null ? c.getObservaciones() : "Cobro recibido",
-                        c.getTotalCobrado(),
-                        c.getId()));
+                String desc = (c.getObservaciones() != null && !c.getObservaciones().isBlank()) ? c.getObservaciones() : "Cobro registrado";
+                movimientos.add(new MovimientoDto(c.getFecha(), "HABER", "COBRO", desc, c.getTotalCobrado(), c.getId()));
             }
         }
 
-        // 3. Ordenar por fecha descending (más reciente primero)
+        // 3. Agregar Notas
+        List<Nota> notas = notaRepository.findByClienteId(clienteId);
+        for (Nota n : notas) {
+            if (n.getEstado() != Nota.EstadoNota.ANULADA) {
+                String tipoNota = n.getTipo() == Nota.TipoNota.DEBITO ? "Débito" : "Crédito";
+                String motivo = (n.getMotivo() != null && !n.getMotivo().isBlank()) ? n.getMotivo() : "";
+                String desc = "Nota de " + tipoNota + " #" + n.getNumero() + (motivo.isEmpty() ? "" : " - " + motivo);
+                movimientos.add(new MovimientoDto(n.getFecha(), n.getTipo() == Nota.TipoNota.DEBITO ? "DEBE" : "HABER", "NOTA", desc, n.getMonto(), n.getId()));
+            }
+        }
+
+        // 4. Ordenar: Fecha DESC, luego por Origen (REMITO < COBRO < NOTA)
         return movimientos.stream()
-                .sorted(Comparator.comparing(MovimientoDto::getFecha).reversed())
+                .sorted((a, b) -> {
+                    int dateComp = b.getFecha().compareTo(a.getFecha());
+                    if (dateComp != 0) return dateComp;
+                    // Mismo día: Remito (3) < Cobro (2) < Nota (1) -> Para que en el reverse del front queden Remito, Cobro, Nota
+                    int pA = getPrioridad(a.getOrigen());
+                    int pB = getPrioridad(b.getOrigen());
+                    return Integer.compare(pB, pA);
+                })
                 .collect(Collectors.toList());
+    }
+
+    private int getPrioridad(String origen) {
+        switch (origen) {
+            case "REMITO": return 3;
+            case "COBRO": return 2;
+            case "NOTA": return 1;
+            default: return 0;
+        }
     }
 
     public Optional<Cobro> buscarPorId(Long id) {
@@ -237,7 +310,11 @@ public class CobroService {
     public BigDecimal calcularSaldoCliente(Long clienteId) {
         BigDecimal deudaTotal = remitoRepository.totalContabilizadoPorCliente(clienteId);
         BigDecimal totalCobrado = cobroRepository.totalCobradoPorCliente(clienteId);
-        return deudaTotal.subtract(totalCobrado);
+        
+        BigDecimal notasDebito = notaRepository.totalDebitoPorCliente(clienteId);
+        BigDecimal notasCredito = notaRepository.totalCreditoPorCliente(clienteId);
+
+        return deudaTotal.add(notasDebito).subtract(totalCobrado).subtract(notasCredito);
     }
 
     @Transactional
@@ -464,6 +541,7 @@ public class CobroService {
                     else if ("CHEQUE".equals(rawMedio)) medioLabel = "Cheque";
                     else if ("CHEQUE_ELECTRONICO".equals(rawMedio)) medioLabel = "E-Cheque";
                     else if ("MERCADO_PAGO".equals(rawMedio)) medioLabel = "Mercado Pago";
+                    else if ("SALDO_A_FAVOR".equals(rawMedio)) medioLabel = "Saldo a Favor";
 
                     String detalleLabel = "";
                     if (rawMedio.contains("CHEQUE")) {
@@ -473,6 +551,8 @@ public class CobroService {
                                         ? mp.getFechaCobro().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy")) : "—");
                     } else if ("TRANSFERENCIA".equals(rawMedio)) {
                         detalleLabel = "Transferencia bancaria";
+                    } else if ("SALDO_A_FAVOR".equals(rawMedio)) {
+                        detalleLabel = "Saldo acreditado de cobros anteriores";
                     }
 
                     cs.beginText();

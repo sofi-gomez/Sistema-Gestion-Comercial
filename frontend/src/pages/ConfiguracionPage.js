@@ -40,9 +40,13 @@ export default function ConfiguracionPage() {
 
     const handleSaveConfig = async () => {
         try {
+            const cleanConfig = {
+                ...config,
+                cuit: (config.cuit || "").replace(/[^0-9-]/g, "") // Limpieza final
+            };
             const res = await apiFetch(API_CONFIG, {
                 method: "PUT",
-                body: JSON.stringify(config)
+                body: JSON.stringify(cleanConfig)
             });
             if (res.ok) {
                 setToast({ title: "Ajustes Guardados", message: "Los parámetros globales se actualizaron correctamente.", type: "success" });
@@ -247,7 +251,7 @@ export default function ConfiguracionPage() {
                                     <input
                                         type="text"
                                         value={config.cuit || ""}
-                                        onChange={e => setConfig({ ...config, cuit: e.target.value })}
+                                        onChange={e => setConfig({ ...config, cuit: e.target.value.replace(/[^0-9-]/g, "") })}
                                         placeholder="Ej: 20-XXXXXXXX-X"
                                     />
                                 </div>

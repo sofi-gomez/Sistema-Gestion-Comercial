@@ -24,8 +24,14 @@ public class ConfiguracionService {
     @Transactional
     public Configuracion actualizarConfiguracion(Configuracion nueva) {
         Configuracion actual = getConfiguracion();
-        actual.setNombreEmpresa(nueva.getNombreEmpresa());
-        actual.setCuit(nueva.getCuit());
+        actual.setNombreEmpresa(nueva.getNombreEmpresa() != null ? nueva.getNombreEmpresa().trim() : "");
+        
+        if (nueva.getCuit() != null) {
+            actual.setCuit(nueva.getCuit().replaceAll("[^0-9]", ""));
+        } else {
+            actual.setCuit("");
+        }
+
         actual.setDireccion(nueva.getDireccion());
         actual.setTelefono(nueva.getTelefono());
         actual.setCotizacionDolar(nueva.getCotizacionDolar());

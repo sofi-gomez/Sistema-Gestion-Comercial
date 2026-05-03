@@ -250,7 +250,7 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
     }
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1000 }}>
                 <div className="modal-header">
                     <h2>{remito ? `Editar Remito #${remito.numero}` : "Nuevo Remito de Venta"}</h2>
@@ -405,6 +405,7 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
                                                 value={it.cantidad}
                                                 onChange={e => updateItem(idx, "cantidad", e.target.value)}
                                                 onWheel={(e) => e.target.blur()}
+                                                onFocus={(e) => e.target.select()}
                                                 placeholder="Cantidad"
                                                 required
                                             />
@@ -443,7 +444,7 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
                     </div>
 
                     <div className="modal-actions">
-                        <button type="button" className="btn-secondary" onClick={onClose}>
+                        <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
                             Cancelar
                         </button>
                         <button type="submit" disabled={saving} className="btn-primary">

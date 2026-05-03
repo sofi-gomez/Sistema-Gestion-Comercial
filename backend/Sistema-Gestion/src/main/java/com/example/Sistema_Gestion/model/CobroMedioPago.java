@@ -16,7 +16,7 @@ import java.time.LocalDate;
 public class CobroMedioPago {
 
     public enum Medio {
-        EFECTIVO, CHEQUE, TRANSFERENCIA
+        EFECTIVO, CHEQUE, TRANSFERENCIA, SALDO_A_FAVOR
     }
 
     public enum TipoCheque {

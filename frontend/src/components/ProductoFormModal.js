@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "../index.css";
 
-export default function ProductoFormModal({ producto, onClose, onSave, cotizacion }) {
+export default function ProductoFormModal({ producto, onClose, onSave, cotizacion, productosExistentes = [] }) {
     const [form, setForm] = useState({
         sku: "",
         nombre: "",
@@ -17,6 +17,9 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
         porcentajeIva: 0,
         porcentajeUtilidad: 0,
     });
+    const [saving, setSaving] = useState(false);
+    const [skuError, setSkuError] = useState("");
+
     const formatDate = (iso) => {
         if (!iso) return "";
         return iso.split("T")[0]; // ejemplo: "2025-12-06"
@@ -79,7 +82,27 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                 porcentajeUtilidad: 0,
             });
         }
-    }, [producto]);
+    }, [producto, cotizacion]);
+
+    // Validación de SKU duplicado en tiempo real
+    useEffect(() => {
+        const skuActual = (form.sku || "").toString().trim().toLowerCase();
+        if (skuActual && (productosExistentes || []).length > 0) {
+            const duplicate = productosExistentes.find(p => {
+                if (!p || !p.sku) return false;
+                const skuExistente = p.sku.toString().trim().toLowerCase();
+                return skuExistente === skuActual && p.id !== producto?.id;
+            });
+
+            if (duplicate) {
+                setSkuError(`Este SKU ya está en uso por: ${duplicate.nombre}`);
+            } else {
+                setSkuError("");
+            }
+        } else {
+            setSkuError("");
+        }
+    }, [form.sku, productosExistentes, producto]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -99,7 +122,6 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
             }
 
             // 2. Recálculo de Precios de Venta basado en Costo, IVA y Utilidad
-            // Watchers: precioCosto, precioCostoUSD (ya sincronizados arriba), porcentajeIva, porcentajeUtilidad
             if (["precioCosto", "precioCostoUSD", "porcentajeIva", "porcentajeUtilidad"].includes(name)) {
                 const costARS = parseFloat(next.precioCosto) || 0;
                 const costUSD = parseFloat(next.precioCostoUSD) || 0;
@@ -119,7 +141,7 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                 }
             }
 
-            // 3. Sincronización manual de Precios de Venta (si el usuario edita la venta directamente)
+            // 3. Sincronización manual de Precios de Venta
             if (name === "precioVentaUSD" && rate > 0) {
                 next.precioVenta = (parseFloat(val) * rate).toFixed(2);
             } else if (name === "precioVenta" && rate > 0) {
@@ -130,30 +152,53 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
         });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        const payload = {
-            ...form,
-            precioCosto: form.precioCosto ? parseFloat(form.precioCosto) : 0,
-            precioVenta: form.precioVenta ? parseFloat(form.precioVenta) : 0,
-            precioCostoUSD: form.precioCostoUSD ? parseFloat(form.precioCostoUSD) : null,
-            precioVentaUSD: form.precioVentaUSD ? parseFloat(form.precioVentaUSD) : null,
-            stock: form.stock ? parseInt(form.stock, 10) : 0, // ✅ Cambiar a parseInt para enteros
-            fechaVencimiento: form.fechaVencimiento ? form.fechaVencimiento : null,
-            porcentajeIva: parseFloat(form.porcentajeIva) || 0,
-            porcentajeUtilidad: parseFloat(form.porcentajeUtilidad) || 0,
-        };
-
-        if (producto?.id) {
-            payload.id = producto.id;
+        if (skuError) {
+            alert("No se puede guardar: " + skuError);
+            return;
         }
 
-        onSave(payload);
+        setSaving(true);
+        try {
+            const payload = {
+                ...form,
+                sku: (form.sku || "").toString().trim(), // Aseguramos SKU limpio
+                precioCosto: form.precioCosto ? parseFloat(form.precioCosto) : 0,
+                precioVenta: form.precioVenta ? parseFloat(form.precioVenta) : 0,
+                precioCostoUSD: form.precioCostoUSD ? parseFloat(form.precioCostoUSD) : null,
+                precioVentaUSD: form.precioVentaUSD ? parseFloat(form.precioVentaUSD) : null,
+                stock: form.stock ? parseInt(form.stock, 10) : 0,
+                fechaVencimiento: form.fechaVencimiento ? form.fechaVencimiento : null,
+                porcentajeIva: parseFloat(form.porcentajeIva) || 0,
+                porcentajeUtilidad: parseFloat(form.porcentajeUtilidad) || 0,
+            };
+
+            // Validar año de vencimiento si existe
+            if (payload.fechaVencimiento) {
+                const year = new Date(payload.fechaVencimiento).getFullYear();
+                if (year < 2000 || year > 2100) {
+                    alert("Por favor ingrese un año de vencimiento válido (entre 2000 y 2100).");
+                    setSaving(false);
+                    return;
+                }
+            }
+
+            if (producto?.id) {
+                payload.id = producto.id;
+            }
+
+            await onSave(payload);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <div className="modal-card" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2>{producto ? "Editar Producto" : "Nuevo Producto"}</h2>
@@ -164,16 +209,17 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                     <div className="modal-content">
                         <div className="form-grid">
 
-                            {/* SECCIÓN 1: INFORMACIÓN BÁSICA */}
                             <div className="form-group">
                                 <label className="form-label">SKU *</label>
                                 <input
                                     name="sku"
                                     value={form.sku}
                                     onChange={handleChange}
-                                    className="modern-input"
+                                    className={`modern-input ${skuError ? 'error' : ''}`}
                                     required
+                                    style={skuError ? { borderColor: '#ef4444' } : {}}
                                 />
+                                {skuError && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>{skuError}</span>}
                             </div>
 
                             <div className="form-group">
@@ -211,6 +257,7 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                                             value={form.precioCosto}
                                             onChange={handleChange}
                                             onWheel={(e) => e.target.blur()}
+                                            onFocus={(e) => e.target.select()}
                                             className="modern-input"
                                             placeholder="Sin IVA"
                                         />
@@ -236,6 +283,7 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                                             value={form.porcentajeIva}
                                             onChange={handleChange}
                                             onWheel={(e) => e.target.blur()}
+                                            onFocus={(e) => e.target.select()}
                                             className="modern-input"
                                         />
                                     </div>
@@ -249,6 +297,7 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                                             value={form.porcentajeUtilidad}
                                             onChange={handleChange}
                                             onWheel={(e) => e.target.blur()}
+                                            onFocus={(e) => e.target.select()}
                                             className="modern-input"
                                         />
                                     </div>
@@ -262,6 +311,7 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                                             value={form.precioVenta}
                                             onChange={handleChange}
                                             onWheel={(e) => e.target.blur()}
+                                            onFocus={(e) => e.target.select()}
                                             className="modern-input"
                                             style={{ borderColor: "#16a34a", background: "#f0fdf4", fontWeight: "700" }}
                                         />
@@ -282,6 +332,7 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                                             value={form.precioCostoUSD}
                                             onChange={handleChange}
                                             onWheel={(e) => e.target.blur()}
+                                            onFocus={(e) => e.target.select()}
                                             className="modern-input"
                                             placeholder="0.00"
                                         />
@@ -307,6 +358,7 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                                             value={form.precioVentaUSD}
                                             onChange={handleChange}
                                             onWheel={(e) => e.target.blur()}
+                                            onFocus={(e) => e.target.select()}
                                             className="modern-input"
                                             style={{ borderColor: "#d97706", fontWeight: "600" }}
                                         />
@@ -370,11 +422,11 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                     </div>
 
                     <div className="modal-actions">
-                        <button type="button" className="btn-secondary" onClick={onClose}>
+                        <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
                             Cancelar
                         </button>
-                        <button type="submit" className="btn-primary">
-                            {producto ? "Actualizar Producto" : "Crear Producto"}
+                        <button type="submit" className="btn-primary" disabled={saving}>
+                            {saving ? "Guardando..." : (producto ? "Actualizar Producto" : "Crear Producto")}
                         </button>
                     </div>
                 </form>

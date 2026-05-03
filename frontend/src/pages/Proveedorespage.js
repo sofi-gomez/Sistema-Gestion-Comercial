@@ -28,6 +28,7 @@ export default function ProveedoresPage() {
   const [toast, setToast] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [pagoParaEditar, setPagoParaEditar] = useState(null);
+  const [returnPath, setReturnPath] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -89,6 +90,14 @@ export default function ProveedoresPage() {
           setActiveTab(location.state.autoOpenTab);
         }
         
+        // Capturamos el path de retorno
+        if (location.state.returnTo) {
+          setReturnPath({
+            path: location.state.returnTo,
+            label: location.state.returnLabel || 'Atrás'
+          });
+        }
+
         // Limpiamos el state para que no se auto-abra repetidamente si el usuario navega
         navigate('.', { replace: true, state: {} });
       }
@@ -110,10 +119,37 @@ export default function ProveedoresPage() {
                   <FiArrowLeft />
                 </button>
                 <div className="title-icon"><FiUsers /></div>
-                <div>
-                  <h1>{selectedProv.nombre}</h1>
-                  <p>{selectedProv.cuit || "Sin CUIT"}</p>
-                </div>
+                 <div>
+                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                     <h1>{selectedProv.nombre}</h1>
+                     {returnPath && (
+                       <button 
+                         onClick={() => navigate(returnPath.path)}
+                         className="btn-modern"
+                         style={{ 
+                           padding: "6px 14px", 
+                           fontSize: "0.8rem", 
+                           background: "#eff6ff", 
+                           color: "#2563eb",
+                           border: "1px solid #bfdbfe",
+                           fontWeight: "700",
+                           borderRadius: "10px",
+                           display: "flex",
+                           alignItems: "center",
+                           gap: "6px",
+                           boxShadow: "0 2px 4px rgba(37, 99, 235, 0.1)",
+                           cursor: "pointer",
+                           transition: "all 0.2s"
+                         }}
+                         onMouseOver={(e) => { e.currentTarget.style.background = "#dbeafe"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                         onMouseOut={(e) => { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.transform = "translateY(0)"; }}
+                       >
+                         <FiArrowLeft /> Volver a {returnPath.label}
+                       </button>
+                     )}
+                   </div>
+                   <p>{selectedProv.cuit || "Sin CUIT"}</p>
+                 </div>
               </div>
               <div style={{ display: "flex", gap: "10px" }}>
                 <button className="btn-modern success" onClick={() => setCompraModalOpen(true)}>

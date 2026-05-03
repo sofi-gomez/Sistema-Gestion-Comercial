@@ -25,6 +25,21 @@ public class ClienteService {
     }
 
     public Cliente guardar(Cliente cliente) {
+        // Limpieza de datos
+        if (cliente.getNombre() != null) cliente.setNombre(cliente.getNombre().trim());
+        if (cliente.getDocumento() != null) {
+            // Limpiar CUIT/DNI: solo números
+            String limpio = cliente.getDocumento().replaceAll("[^0-9]", "");
+            cliente.setDocumento(limpio);
+        }
+
+        // Verificación de duplicados
+        if (cliente.getDocumento() != null && !cliente.getDocumento().isEmpty()) {
+            clienteRepository.findByDocumento(cliente.getDocumento()).ifPresent(c -> {
+                throw new RuntimeException("El documento/CUIT '" + cliente.getDocumento() + "' ya existe para el cliente: " + c.getNombre());
+            });
+        }
+
         return clienteRepository.save(cliente);
     }
 
@@ -32,11 +47,22 @@ public class ClienteService {
         Cliente existente = clienteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
 
-        existente.setNombre(cliente.getNombre());
-        existente.setDocumento(cliente.getDocumento());
+        String nuevoDoc = cliente.getDocumento() != null ? cliente.getDocumento().replaceAll("[^0-9]", "") : "";
+        
+        // Verificación de duplicado si el documento cambió
+        if (!nuevoDoc.isEmpty()) {
+            clienteRepository.findByDocumento(nuevoDoc).ifPresent(c -> {
+                if (!c.getId().equals(id)) {
+                    throw new RuntimeException("No se puede actualizar: El documento '" + nuevoDoc + "' ya pertenece a otro cliente (" + c.getNombre() + ")");
+                }
+            });
+        }
+
+        existente.setNombre(cliente.getNombre() != null ? cliente.getNombre().trim() : "");
+        existente.setDocumento(nuevoDoc);
         existente.setTelefono(cliente.getTelefono());
         existente.setEmail(cliente.getEmail());
-        existente.setDireccion(cliente.getDireccion()); // Agregar esta línea
+        existente.setDireccion(cliente.getDireccion());
         existente.setNotas(cliente.getNotas());
 
         return clienteRepository.save(existente);
