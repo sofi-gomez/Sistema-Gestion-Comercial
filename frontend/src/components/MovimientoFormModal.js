@@ -10,6 +10,7 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
     const [referencia, setReferencia] = useState("");
     const [descripcion, setDescripcion] = useState("");
     const [entidad, setEntidad] = useState("");
+    const [saving, setSaving] = useState(false);
 
     // Campos de cheque
     const [banco, setBanco] = useState("");
@@ -68,6 +69,7 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
             movimiento.fechaVencimiento = fechaVencimiento || null;
         }
 
+        setSaving(true);
         try {
             const url = movimientoEditar
                 ? `${API_BASE}/${movimientoEditar.id}`
@@ -88,13 +90,15 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
         } catch (err) {
             console.error("Error guardando movimiento:", err);
             alert("Error al guardar el movimiento: " + err.message);
+        } finally {
+            setSaving(false);
         }
     };
 
     const esCheque = medioPago.includes("CHEQUE");
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <div className="modal-card" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2>{movimientoEditar ? "Editar Movimiento" : "Nuevo Movimiento"}</h2>
@@ -210,11 +214,11 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
                     </div>
 
                     <div className="modal-actions">
-                        <button type="button" className="btn-secondary" onClick={onClose}>
+                        <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
                             Cancelar
                         </button>
-                        <button type="submit" className="btn-primary">
-                            {movimientoEditar ? "Actualizar Movimiento" : "Crear Movimiento"}
+                        <button type="submit" className="btn-primary" disabled={saving}>
+                            {saving ? "Guardando..." : (movimientoEditar ? "Actualizar Movimiento" : "Crear Movimiento")}
                         </button>
                     </div>
                 </form>

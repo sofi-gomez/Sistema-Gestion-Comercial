@@ -21,6 +21,7 @@ export default function ClientesPage() {
   const [viewDetail, setViewDetail] = useState(false);
   const [activeTab, setActiveTab] = useState("ctacte");
   const [toast, setToast] = useState(null);
+  const [returnPath, setReturnPath] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -45,7 +46,16 @@ export default function ClientesPage() {
         if (location.state.autoOpenTab) {
           setActiveTab(location.state.autoOpenTab);
         }
-        // Limpiamos el state para evitar reaperturas accidentales
+        
+        // Capturamos el path de retorno antes de limpiar el state
+        if (location.state.returnTo) {
+          setReturnPath({
+            path: location.state.returnTo,
+            label: location.state.returnLabel || 'Atrás'
+          });
+        }
+
+        // Limpiamos el state para evitar reaperturas accidentales, pero mantenemos el returnTo localmente
         navigate('.', { replace: true, state: {} });
       }
     }
@@ -97,7 +107,34 @@ export default function ClientesPage() {
               </button>
               <div className="title-icon"><FiUser /></div>
               <div>
-                <h1>{selectedCliente.nombre}</h1>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                  <h1>{selectedCliente.nombre}</h1>
+                  {returnPath && (
+                    <button 
+                      onClick={() => navigate(returnPath.path)}
+                      className="btn-modern"
+                      style={{ 
+                        padding: "6px 14px", 
+                        fontSize: "0.8rem", 
+                        background: "#eff6ff", 
+                        color: "#2563eb",
+                        border: "1px solid #bfdbfe",
+                        fontWeight: "700",
+                        borderRadius: "10px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        boxShadow: "0 2px 4px rgba(37, 99, 235, 0.1)",
+                        cursor: "pointer",
+                        transition: "all 0.2s"
+                      }}
+                      onMouseOver={(e) => { e.currentTarget.style.background = "#dbeafe"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                      onMouseOut={(e) => { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.transform = "translateY(0)"; }}
+                    >
+                      <FiArrowLeft /> Volver a {returnPath.label}
+                    </button>
+                  )}
+                </div>
                 <p>{selectedCliente.documento || "Sin documento"}</p>
               </div>
             </div>

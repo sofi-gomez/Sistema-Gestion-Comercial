@@ -160,7 +160,7 @@ export default function ValorizarSection({ onUpdate, initialRemito, onClose }) {
         const isReValorizar = selected.estado === "VALORIZADO" || selected.estado === "COBRADO";
 
         return (
-            <div className="modal-overlay" onClick={() => initialRemito ? onClose() : setSelected(null)}>
+            <div className="modal-overlay">
                 <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: "750px" }}>
                     <div className="modal-header">
                         <h2>{isReValorizar ? "Re-valorizar" : "Valorizar"} Remito #{selected.numero}</h2>

@@ -88,7 +88,14 @@ public class RemitoService {
         // Gestión de stock al momento de crear el remito
         if (saved.getItems() != null) {
             for (RemitoItem item : saved.getItems()) {
-                if (item.getProducto() != null && item.getCantidad() != null) {
+                // VALIDACIÓN DE CANTIDAD > 0
+                if (item.getCantidad() == null || item.getCantidad().compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new IllegalArgumentException("La cantidad del producto '" + 
+                        (item.getProducto() != null ? item.getProducto().getNombre() : "desconocido") + 
+                        "' debe ser mayor a 0.");
+                }
+
+                if (item.getProducto() != null) {
                     boolean ok = productoService.descontarStock(
                             item.getProducto().getId(),
                             item.getCantidad().intValue());
@@ -210,10 +217,15 @@ public class RemitoService {
         // 5. Agregar los nuevos ítems y descontar stock
         if (remitoDraft.getItems() != null) {
             for (RemitoItem newItem : remitoDraft.getItems()) {
+                // VALIDACIÓN DE CANTIDAD > 0
+                if (newItem.getCantidad() == null || newItem.getCantidad().compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new IllegalArgumentException("No se puede actualizar: hay ítems con cantidad 0 o negativa.");
+                }
+
                 newItem.setId(null); // Asegurar que se traten como nuevos items
                 remitoPersistido.addItem(newItem);
                 
-                if (newItem.getProducto() != null && newItem.getCantidad() != null) {
+                if (newItem.getProducto() != null) {
                     boolean ok = productoService.descontarStock(
                         newItem.getProducto().getId(), 
                         newItem.getCantidad().intValue()

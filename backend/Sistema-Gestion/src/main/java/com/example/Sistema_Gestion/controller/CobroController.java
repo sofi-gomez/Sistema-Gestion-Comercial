@@ -53,6 +53,7 @@ public class CobroController {
         return cobroService.registrarCobro(
                 req.getCobro(),
                 req.getImportesPorRemito(),
+                req.getImportesPorNotaDebito(),
                 req.getMediosPago());
     }
 
@@ -133,6 +134,8 @@ public class CobroController {
         private Map<Long, BigDecimal> importesPorRemito;
         private List<CobroMedioPago> mediosPago;
 
+        private Map<Long, BigDecimal> importesPorNotaDebito;
+
         public Cobro getCobro() {
             return cobro;
         }
@@ -147,6 +150,14 @@ public class CobroController {
 
         public void setImportesPorRemito(Map<Long, BigDecimal> importesPorRemito) {
             this.importesPorRemito = importesPorRemito;
+        }
+
+        public Map<Long, BigDecimal> getImportesPorNotaDebito() {
+            return importesPorNotaDebito;
+        }
+
+        public void setImportesPorNotaDebito(Map<Long, BigDecimal> importesPorNotaDebito) {
+            this.importesPorNotaDebito = importesPorNotaDebito;
         }
 
         public List<CobroMedioPago> getMediosPago() {

@@ -120,19 +120,30 @@ export default function MercaderiaPage() {
     const method = producto.id ? "PUT" : "POST";
     const url = producto.id ? `${API_URL}/${producto.id}` : API_URL;
 
-    await apiFetch(url, {
-      method,
-      body: JSON.stringify(producto),
-    });
+    try {
+      const res = await apiFetch(url, {
+        method,
+        body: JSON.stringify(producto),
+      });
 
-    setModalOpen(false);
-    setEditing(null);
-    fetchProductosAndConfig();
-    setToast({
-      title: producto.id ? "Producto actualizado" : "Producto creado",
-      message: `El producto ${producto.nombre} se guardó correctamente.`,
-      type: "success"
-    });
+      if (!res.ok) {
+        const errData = await res.json();
+        alert("Error al guardar el producto: " + (errData.error || "Error desconocido"));
+        return;
+      }
+
+      setModalOpen(false);
+      setEditing(null);
+      fetchProductosAndConfig();
+      setToast({
+        title: producto.id ? "Producto actualizado" : "Producto creado",
+        message: `El producto ${producto.nombre} se guardó correctamente.`,
+        type: "success"
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Error de conexión al guardar el producto.");
+    }
   };
 
   // ==================== FILTRADO DE PRODUCTOS ====================
@@ -643,6 +654,7 @@ export default function MercaderiaPage() {
           cotizacion={configuracion?.cotizacionDolar}
           onClose={() => { setModalOpen(false); setEditing(null); }}
           onSave={handleSave}
+          productosExistentes={productos}
         />
       )}
 

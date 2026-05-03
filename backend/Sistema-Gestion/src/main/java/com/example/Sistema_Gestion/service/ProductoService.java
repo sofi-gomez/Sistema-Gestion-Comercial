@@ -36,6 +36,17 @@ public class ProductoService {
     }
 
     public Producto guardar(Producto producto) {
+        // Limpieza de datos
+        if (producto.getSku() != null) producto.setSku(producto.getSku().trim());
+        if (producto.getNombre() != null) producto.setNombre(producto.getNombre().trim());
+
+        // Verificación de duplicados (Evitar 500 genérico de DB)
+        if (producto.getSku() != null && !producto.getSku().isEmpty()) {
+            productoRepository.findBySku(producto.getSku()).ifPresent(p -> {
+                throw new RuntimeException("El SKU '" + producto.getSku() + "' ya está en uso por el producto: " + p.getNombre());
+            });
+        }
+        
         return productoRepository.save(producto);
     }
 
@@ -45,6 +56,8 @@ public class ProductoService {
 
     @Transactional
     public boolean descontarStock(Long productoId, Integer cantidad) {
+        if (cantidad == null || cantidad <= 0) return false;
+        
         return productoRepository.findById(productoId).map(producto -> {
             Integer stockActual = producto.getStock() != null ? producto.getStock() : 0;
 
@@ -59,6 +72,8 @@ public class ProductoService {
 
     @Transactional
     public void aumentarStock(Long productoId, Integer cantidad) {
+        if (cantidad == null || cantidad <= 0) return;
+        
         productoRepository.findById(productoId).ifPresent(producto -> {
             Integer stockActual = producto.getStock() != null ? producto.getStock() : 0;
             producto.setStock(stockActual + cantidad);
@@ -68,6 +83,8 @@ public class ProductoService {
 
     @Transactional
     public void forzarDescontarStock(Long productoId, Integer cantidad) {
+        if (cantidad == null || cantidad <= 0) return;
+        
         productoRepository.findById(productoId).ifPresent(producto -> {
             Integer stockActual = producto.getStock() != null ? producto.getStock() : 0;
             producto.setStock(stockActual - cantidad);
@@ -77,10 +94,23 @@ public class ProductoService {
 
     @Transactional
     public Producto actualizarProductoInfo(Long id, Producto data) {
+        // Limpieza de datos
+        String nuevoSku = data.getSku() != null ? data.getSku().trim() : "";
+        String nuevoNombre = data.getNombre() != null ? data.getNombre().trim() : "";
+
+        // Verificación de duplicado si el SKU cambió
+        if (!nuevoSku.isEmpty()) {
+            productoRepository.findBySku(nuevoSku).ifPresent(p -> {
+                if (!p.getId().equals(id)) {
+                    throw new RuntimeException("No se puede actualizar: El SKU '" + nuevoSku + "' ya está siendo usado por otro producto.");
+                }
+            });
+        }
+
         return productoRepository.findById(id).map(p -> {
-            p.setNombre(data.getNombre());
-            p.setSku(data.getSku());
-            p.setDescripcion(data.getDescripcion());
+            p.setNombre(nuevoNombre);
+            p.setSku(nuevoSku);
+            p.setDescripcion(data.getDescripcion() != null ? data.getDescripcion().trim() : "");
             p.setPrecioCosto(data.getPrecioCosto());
             p.setPrecioVenta(data.getPrecioVenta());
             p.setPrecioCostoUSD(data.getPrecioCostoUSD());
@@ -90,7 +120,6 @@ public class ProductoService {
             p.setFechaVencimiento(data.getFechaVencimiento());
             p.setPorcentajeIva(data.getPorcentajeIva());
             p.setPorcentajeUtilidad(data.getPorcentajeUtilidad());
-            // El campo stock NO se actualiza aquí para evitar sobrescrituras accidentales
             return productoRepository.save(p);
         }).orElseThrow(() -> new RuntimeException("Producto no encontrado"));
     }

@@ -73,7 +73,9 @@ export default function CajaDiariaSection() {
                     if (pago && pago.proveedor && pago.proveedor.id) {
                         navigate('/proveedores', { state: { 
                             autoOpenProveedorId: pago.proveedor.id, 
-                            autoOpenTab: targetTab || 'ctacte' 
+                            autoOpenTab: targetTab || 'ctacte',
+                            returnTo: '/tesoreria',
+                            returnLabel: 'Caja Diaria'
                         } });
                     } else {
                         alert("No se pudo hallar al proveedor de este pago.");
@@ -94,7 +96,9 @@ export default function CajaDiariaSection() {
                     if (cobro && cobro.cliente && cobro.cliente.id) {
                         navigate('/clientes', { state: { 
                             autoOpenClienteId: cobro.cliente.id, 
-                            autoOpenTab: targetTab || 'remitos' 
+                            autoOpenTab: targetTab || 'remitos',
+                            returnTo: '/tesoreria',
+                            returnLabel: 'Caja Diaria'
                         } });
                     } else {
                         alert("No se pudo hallar al cliente de este cobro.");

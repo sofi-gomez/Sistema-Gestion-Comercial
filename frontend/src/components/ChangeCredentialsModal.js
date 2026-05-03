@@ -57,7 +57,7 @@ export default function ChangeCredentialsModal({ onClose, onSaved }) {
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <div className="modal-card modal-auth" onClick={e => e.stopPropagation()} style={{ maxWidth: "400px" }}>
                 <div className="modal-header">
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>

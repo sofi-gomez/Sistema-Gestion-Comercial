@@ -112,6 +112,17 @@ export default function PagoProveedorFormModal({ onClose, onSaved, proveedorIdPr
             }
         }
 
+        if (esCheque) {
+            if (!banco || !numeroCheque || !fechaEmision || !fechaVencimiento) {
+                alert("Por favor complete todos los datos del cheque.");
+                return;
+            }
+            if (fechaVencimiento < fechaEmision) {
+                alert("La fecha de cobro/vencimiento no puede ser anterior a la de emisión.");
+                return;
+            }
+        }
+
         setLoading(true);
         try {
             const isEdit = !!pagoEditar;
@@ -172,7 +183,7 @@ export default function PagoProveedorFormModal({ onClose, onSaved, proveedorIdPr
     const bannerInfo = getBannerInfo();
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: "500px" }}>
                 <div className="modal-header">
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -198,6 +209,7 @@ export default function PagoProveedorFormModal({ onClose, onSaved, proveedorIdPr
                                         value={monto}
                                         onChange={e => setMonto(e.target.value)}
                                         onWheel={(e) => e.target.blur()}
+                                        onFocus={(e) => e.target.select()}
                                         placeholder={monedaPago === "USD" ? "0.00 dólares" : "0.00 pesos"}
                                         required
                                         disabled={!!pagoEditar}
@@ -267,6 +279,7 @@ export default function PagoProveedorFormModal({ onClose, onSaved, proveedorIdPr
                                             value={tipoCambio}
                                             onChange={e => setTipoCambio(e.target.value)}
                                             onWheel={(e) => e.target.blur()}
+                                            onFocus={(e) => e.target.select()}
                                             step="0.01"
                                             min="1"
                                             required

@@ -21,6 +21,9 @@ frontend/frontend_error.log
 # ⚠️ SEGURIDAD: Archivos con credenciales reales - NUNCA subir al repo público
 backend/Sistema-Gestion/src/main/resources/application.properties
 
+# Archivos de prueba temporales en la raíz
+TestJackson.java
+
 # Database
 *.sql
 

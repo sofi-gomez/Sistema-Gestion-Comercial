@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.math.BigDecimal;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tesoreria")
@@ -55,6 +57,17 @@ public class TesoreriaController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PutMapping("/{id}/rechazar")
+    public ResponseEntity<MovimientoTesoreria> rechazarCheque(
+            @PathVariable("id") Long id,
+            @RequestBody(required = false) Map<String, BigDecimal> body) {
+        log.info("Marcando cheque ID: {} como rechazado", id);
+        BigDecimal gastos = (body != null && body.containsKey("gastosBancarios")) ? body.get("gastosBancarios") : BigDecimal.ZERO;
+        return tesoreriaService.rechazarCheque(id, gastos)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> anularMovimiento(@PathVariable("id") Long id) {
         log.info("Anulando movimiento de tesorería ID: {}", id);
@@ -82,5 +95,10 @@ public class TesoreriaController {
                 ? LocalDate.parse(fechaStr)
                 : LocalDate.now();
         return ResponseEntity.ok(tesoreriaService.getResumenDia(fecha));
+    }
+
+    @GetMapping("/cheques/cliente/{clienteId}")
+    public List<MovimientoTesoreria> listarChequesPorCliente(@PathVariable Long clienteId) {
+        return tesoreriaService.buscarChequesPorCliente(clienteId);
     }
 }

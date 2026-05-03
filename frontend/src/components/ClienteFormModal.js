@@ -13,6 +13,7 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
   });
 
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (cliente) {
@@ -58,25 +59,46 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
 
-    // Limpiar error cuando el usuario empiece a escribir
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: "" }));
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleCuitChange = (e) => {
+    const { name, value } = e.target;
+    // Solo permitir números y guiones
+    const filteredValue = value.replace(/[^0-9-]/g, "");
+    setForm(prev => ({ ...prev, [name]: filteredValue }));
+
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) {
       return;
     }
 
-    const payload = cliente ? { ...form, id: cliente.id } : form;
-    onSave(payload);
+    setSaving(true);
+    try {
+      const payload = {
+        ...form,
+        documento: form.documento.replace(/[^0-9-]/g, ""), // Limpieza final antes de enviar
+        id: cliente?.id
+      };
+      await onSave(payload);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{cliente ? "Editar Cliente" : "Nuevo Cliente"}</h2>
@@ -104,7 +126,7 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
                 <input
                   name="documento"
                   value={form.documento}
-                  onChange={handleChange}
+                  onChange={handleCuitChange}
                   className="modern-input"
                   placeholder="DNI, CUIT, etc."
                 />
@@ -171,11 +193,11 @@ export default function ClienteFormModal({ cliente, onClose, onSave }) {
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={onClose}>
+            <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
               Cancelar
             </button>
-            <button type="submit" className="btn-primary">
-              {cliente ? "Actualizar Cliente" : "Crear Cliente"}
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? "Guardando..." : (cliente ? "Actualizar Cliente" : "Crear Cliente")}
             </button>
           </div>
         </form>

@@ -60,6 +60,9 @@ public class MovimientoTesoreria {
     @Column(name = "cobrado", nullable = false)
     private Boolean cobrado = false;
 
+    @Column(name = "rechazado", nullable = false)
+    private Boolean rechazado = false;
+
     @Column(length = 200)
     private String entidad; // Cliente, Proveedor o Persona externa
 
@@ -285,6 +288,14 @@ public class MovimientoTesoreria {
 
     public void setCobrado(Boolean cobrado) {
         this.cobrado = cobrado;
+    }
+
+    public Boolean getRechazado() {
+        return rechazado;
+    }
+
+    public void setRechazado(Boolean rechazado) {
+        this.rechazado = rechazado;
     }
 
     public String getEntidad() {

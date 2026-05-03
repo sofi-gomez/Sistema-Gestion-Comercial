@@ -51,6 +51,10 @@ public class Cobro {
     @JsonManagedReference("cobro-medios")
     private List<CobroMedioPago> mediosPago = new ArrayList<>();
 
+    @OneToMany(mappedBy = "cobro", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @JsonManagedReference("cobro-notas")
+    private List<CobroNota> notas = new ArrayList<>();
+
     @PrePersist
     public void prePersist() {
         if (fecha == null)
@@ -130,5 +134,13 @@ public class Cobro {
 
     public void setMediosPago(List<CobroMedioPago> mediosPago) {
         this.mediosPago = mediosPago;
+    }
+
+    public List<CobroNota> getNotas() {
+        return notas;
+    }
+
+    public void setNotas(List<CobroNota> notas) {
+        this.notas = notas;
     }
 }

@@ -20,14 +20,17 @@ public class TesoreriaService {
     private final MovimientoTesoreriaRepository movimientoRepository;
     private final CobroService cobroService;
     private final PagoProveedorService pagoProveedorService;
+    private final NotaService notaService;
 
     public TesoreriaService(
             MovimientoTesoreriaRepository movimientoRepository,
             @org.springframework.context.annotation.Lazy CobroService cobroService,
-            @org.springframework.context.annotation.Lazy PagoProveedorService pagoProveedorService) {
+            @org.springframework.context.annotation.Lazy PagoProveedorService pagoProveedorService,
+            @org.springframework.context.annotation.Lazy NotaService notaService) {
         this.movimientoRepository = movimientoRepository;
         this.cobroService = cobroService;
         this.pagoProveedorService = pagoProveedorService;
+        this.notaService = notaService;
     }
 
     public MovimientoTesoreria registrarMovimiento(MovimientoTesoreria movimiento) {
@@ -136,6 +139,54 @@ public class TesoreriaService {
         return movimientoRepository.findById(id).map(movimiento -> {
             movimiento.setCobrado(true);
             return movimientoRepository.save(movimiento);
+        });
+    }
+
+    @Transactional
+    public Optional<MovimientoTesoreria> rechazarCheque(Long id, BigDecimal gastosBancarios) {
+        return movimientoRepository.findById(id).map(movimiento -> {
+            // 1. Marcar como rechazado
+            movimiento.setRechazado(true);
+            movimientoRepository.save(movimiento);
+
+            // 2. Generar egreso en tesorería para anular el ingreso previo
+            MovimientoTesoreria egreso = new MovimientoTesoreria();
+            egreso.setTipo("EGRESO");
+            egreso.setMedioPago(movimiento.getMedioPago());
+            egreso.setImporte(movimiento.getImporte());
+            egreso.setFecha(LocalDateTime.now());
+            egreso.setDescripcion("Reversión por Cheque Rechazado N° " + movimiento.getNumeroCheque());
+            egreso.setEntidad(movimiento.getEntidad());
+            egreso.setReferencia(movimiento.getReferencia());
+            movimientoRepository.save(egreso);
+
+            // 3. Obtener cliente y generar nota de débito
+            String ref = movimiento.getReferencia();
+            if (ref != null && ref.contains("Cobro #")) {
+                try {
+                    String idPart = ref.split("#")[1].trim();
+                    Long cobroId = Long.parseLong(idPart);
+                    cobroService.buscarPorId(cobroId).ifPresent(cobro -> {
+                        if (cobro.getCliente() != null) {
+                            BigDecimal montoNota = movimiento.getImporte().add(gastosBancarios != null ? gastosBancarios : BigDecimal.ZERO);
+                            String motivoNota = "Cheque rechazado N° " + movimiento.getNumeroCheque();
+                            if (gastosBancarios != null && gastosBancarios.compareTo(BigDecimal.ZERO) > 0) {
+                                motivoNota += " + Gastos bancarios";
+                            }
+                            notaService.crearNota(
+                                    cobro.getCliente().getId(),
+                                    com.example.Sistema_Gestion.model.Nota.TipoNota.DEBITO,
+                                    montoNota,
+                                    motivoNota
+                            );
+                        }
+                    });
+                } catch (Exception e) {
+                    System.err.println("Error al procesar cobro de cheque rechazado: " + e.getMessage());
+                }
+            }
+
+            return movimiento;
         });
     }
 
@@ -257,5 +308,25 @@ public class TesoreriaService {
         resumen.put("chequesParaCobrarImporte", disponibleImporte);
 
         return resumen;
+    }
+
+    public List<MovimientoTesoreria> buscarChequesPorCliente(Long clienteId) {
+        List<Long> cobroIds = cobroService.listarPorCliente(clienteId).stream()
+                .map(com.example.Sistema_Gestion.model.Cobro::getId)
+                .toList();
+        
+        List<MovimientoTesoreria> results = new ArrayList<>();
+        for (Long cid : cobroIds) {
+            List<MovimientoTesoreria> movs = movimientoRepository.findByReferencia("Cobro #" + cid);
+            for (MovimientoTesoreria m : movs) {
+                if (Boolean.FALSE.equals(m.getAnulado()) && 
+                    Boolean.FALSE.equals(m.getCobrado()) &&
+                    Boolean.FALSE.equals(m.getRechazado()) &&
+                    ("CHEQUE".equalsIgnoreCase(m.getMedioPago()) || "CHEQUE_ELECTRONICO".equalsIgnoreCase(m.getMedioPago()))) {
+                    results.add(m);
+                }
+            }
+        }
+        return results;
     }
 }

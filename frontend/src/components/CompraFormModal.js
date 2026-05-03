@@ -278,7 +278,7 @@ export default function CompraFormModal({ proveedor, onClose, onSaved, compraEdi
 
     return (
         <>
-            <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-overlay">
                 <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: "1000px" }}>
                     <div className="modal-header">
                         <h2>{compraEditar ? `Editar Compra Nº ${compraEditar.numero}` : `Registrar Compra a ${proveedor?.nombre || "Proveedor"}`}</h2>
@@ -544,7 +544,7 @@ export default function CompraFormModal({ proveedor, onClose, onSaved, compraEdi
                         </div>
 
                         <div className="modal-actions" style={{ marginTop: "2rem" }}>
-                            <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
+                            <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button>
                             <button type="submit" disabled={saving} className="btn-primary"><FiSave /> {saving ? "Guardando..." : (compraEditar ? "Guardar Cambios" : "Confirmar Compra")}</button>
                         </div>
                     </form>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FiFileText, FiSearch, FiEdit2, FiTrash2, FiPlus,
   FiDownload, FiDollarSign, FiClock, FiCreditCard,
@@ -8,6 +9,7 @@ import RemitoFormModal from "../components/RemitoFormModal";
 import ValorizarSection from "../components/ValorizarSection";
 import CobrosSection from "../components/CobrosSection";
 import CobroFormModal from "../components/CobroFormModal";
+import VentaRapidaModal from "../components/VentaRapidaModal";
 import Toast from "../components/Toast";
 import ItemsTooltip from "../components/ItemsTooltip";
 import { apiFetch } from "../utils/api";
@@ -21,12 +23,26 @@ export default function RemitosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("todos");
   const [modalRemitoOpen, setModalRemitoOpen] = useState(false);
+  const [modalVentaRapidaOpen, setModalVentaRapidaOpen] = useState(false);
   const [editingRemito, setEditingRemito] = useState(null);
   const [valorizingRemito, setValorizingRemito] = useState(null);
   const [cobrandoRemito, setCobrandoRemito] = useState(null);
   const [toast, setToast] = useState(null);
   const [metrics, setMetrics] = useState({ ventasHoy: 0, ventasSemana: 0, ventasMes: 0 });
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const navigate = useNavigate();
+
+  const handleClientClick = (clienteId, tab = 'remitos') => {
+    if (!clienteId) return;
+    navigate('/clientes', { 
+      state: { 
+        autoOpenClienteId: clienteId, 
+        autoOpenTab: tab,
+        returnTo: '/remitos',
+        returnLabel: 'Ventas y Remitos'
+      } 
+    });
+  };
 
   const toggleRow = (id) => {
     const newExpanded = new Set(expandedRows);
@@ -114,7 +130,10 @@ export default function RemitosPage() {
               <p>Gestión integral del flujo de salida de mercadería</p>
             </div>
           </div>
-          <div className="header-actions">
+          <div className="header-actions" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <button onClick={() => setModalVentaRapidaOpen(true)} className="btn-primary" style={{ backgroundColor: "#f97316", borderColor: "#f97316" }}>
+              ⚡ Venta Rápida
+            </button>
             <button onClick={() => { setEditingRemito(null); setModalRemitoOpen(true); }} className="btn-primary">
               <FiPlus /> Nuevo Remito
             </button>
@@ -207,7 +226,13 @@ export default function RemitosPage() {
                       <td className="sku-cell"><span className="sku-badge">#{r.numero}</span></td>
                       <td>{formatDateLocal(r.fecha)}</td>
                       <td>
-                        <div style={{ fontWeight: "500" }}>{r.clienteNombre}</div>
+                        <div 
+                          style={{ fontWeight: "500", color: "var(--primary)", cursor: "pointer", textDecoration: "underline" }}
+                          onClick={() => handleClientClick(r.cliente?.id)}
+                          title="Ver cuenta del cliente"
+                        >
+                          {r.clienteNombre}
+                        </div>
                         {r.cliente?.notas && (
                           <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "4px", maxWidth: "200px", whiteSpace: "normal" }}>
                             <strong>Notas:</strong> {r.cliente.notas}
@@ -307,7 +332,13 @@ export default function RemitosPage() {
                     <td className="sku-cell"><span className="sku-badge">#{r.numero}</span></td>
                     <td>{formatDateLocal(r.fecha)}</td>
                     <td>
-                      <div style={{ fontWeight: "500" }}>{r.clienteNombre}</div>
+                      <div 
+                        style={{ fontWeight: "500", color: "var(--primary)", cursor: "pointer", textDecoration: "underline" }}
+                        onClick={() => handleClientClick(r.cliente?.id)}
+                        title="Ver cuenta del cliente"
+                      >
+                        {r.clienteNombre}
+                      </div>
                       {r.cliente?.notas && (
                         <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "4px", maxWidth: "200px", whiteSpace: "normal" }}>
                           <strong>Notas:</strong> {r.cliente.notas}
@@ -430,7 +461,15 @@ export default function RemitosPage() {
                         </td>
                         <td className="sku-cell"><span className="sku-badge">#{v.numeroInterno}</span></td>
                         <td>{formatDateLocal(v.fecha)}</td>
-                        <td>{v.nombreCliente}</td>
+                        <td>
+                          <span 
+                            onClick={() => handleClientClick(v.cliente?.id)}
+                            style={{ color: "var(--primary)", cursor: "pointer", textDecoration: "underline", fontWeight: "500" }}
+                            title="Ver cuenta del cliente"
+                          >
+                            {v.nombreCliente}
+                          </span>
+                        </td>
                         <td>
                           <button
                             className="btn-modern secondary"
@@ -512,6 +551,21 @@ export default function RemitosPage() {
               message: "El comprobante se generó correctamente.",
               type: "success"
             });
+          }}
+        />
+      )}
+
+      {modalVentaRapidaOpen && (
+        <VentaRapidaModal
+          onClose={() => setModalVentaRapidaOpen(false)}
+          onSaved={() => {
+            setModalVentaRapidaOpen(false);
+            setToast({
+              title: "Venta rápida exitosa",
+              message: "Se generó el remito, se descontó el stock y se registró el cobro.",
+              type: "success"
+            });
+            fetchData();
           }}
         />
       )}

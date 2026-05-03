@@ -11,6 +11,7 @@ export default function ProveedoresFormModal({ proveedor, onClose, onSave }) {
     condicionIva: "",
     notas: ""
   });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (proveedor) {
@@ -41,14 +42,32 @@ export default function ProveedoresFormModal({ proveedor, onClose, onSave }) {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleCuitChange = (e) => {
+    const { name, value } = e.target;
+    // Solo permitir números y guiones
+    const filteredValue = value.replace(/[^0-9-]/g, "");
+    setForm(prev => ({ ...prev, [name]: filteredValue }));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = proveedor ? { ...form, id: proveedor.id } : form;
-    onSave(payload);
+    setSaving(true);
+    try {
+      const payload = {
+        ...form,
+        cuit: form.cuit.replace(/[^0-9-]/g, ""), // Limpieza final
+        id: proveedor?.id
+      };
+      await onSave(payload);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{proveedor ? "Editar Proveedor" : "Nuevo Proveedor"}</h2>
@@ -75,7 +94,7 @@ export default function ProveedoresFormModal({ proveedor, onClose, onSave }) {
                 <input 
                   name="cuit" 
                   value={form.cuit} 
-                  onChange={handleChange} 
+                  onChange={handleCuitChange} 
                   className="modern-input" 
                   placeholder="00-00000000-0"
                 />
@@ -146,11 +165,11 @@ export default function ProveedoresFormModal({ proveedor, onClose, onSave }) {
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={onClose}>
+            <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
               Cancelar
             </button>
-            <button type="submit" className="btn-primary">
-              {proveedor ? "Actualizar Proveedor" : "Crear Proveedor"}
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? "Guardando..." : (proveedor ? "Actualizar Proveedor" : "Crear Proveedor")}
             </button>
           </div>
         </form>
