@@ -32,10 +32,15 @@ public class Nota {
     @Column(nullable = false)
     private TipoNota tipo;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cliente_id", nullable = false)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "cliente_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "remitos", "cobros"})
     private Cliente cliente;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "proveedor_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "compras", "pagos"})
+    private Proveedor proveedor;
 
     @Column(nullable = false)
     private LocalDate fecha;
@@ -45,6 +50,9 @@ public class Nota {
 
     @Column(length = 255, nullable = false)
     private String motivo;
+
+    @Column(length = 3)
+    private String moneda = "ARS"; // "ARS" o "USD"
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -92,6 +100,14 @@ public class Nota {
         this.cliente = cliente;
     }
 
+    public Proveedor getProveedor() {
+        return proveedor;
+    }
+
+    public void setProveedor(Proveedor proveedor) {
+        this.proveedor = proveedor;
+    }
+
     public LocalDate getFecha() {
         return fecha;
     }
@@ -114,6 +130,14 @@ public class Nota {
 
     public void setMotivo(String motivo) {
         this.motivo = motivo;
+    }
+
+    public String getMoneda() {
+        return moneda;
+    }
+
+    public void setMoneda(String moneda) {
+        this.moneda = moneda;
     }
 
     public EstadoNota getEstado() {

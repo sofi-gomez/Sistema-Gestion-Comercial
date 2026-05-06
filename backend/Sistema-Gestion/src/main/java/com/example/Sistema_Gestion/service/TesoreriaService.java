@@ -41,6 +41,10 @@ public class TesoreriaService {
         return movimientoRepository.findAll();
     }
 
+    public org.springframework.data.domain.Page<MovimientoTesoreria> listarTodosPaginado(org.springframework.data.domain.Pageable pageable) {
+        return movimientoRepository.findAll(pageable);
+    }
+
     public List<MovimientoTesoreria> listarPorRango(LocalDateTime desde, LocalDateTime hasta) {
         return movimientoRepository.findByFechaBetween(desde, hasta);
     }
@@ -137,6 +141,15 @@ public class TesoreriaService {
     @Transactional
     public Optional<MovimientoTesoreria> marcarComoCobrado(Long id) {
         return movimientoRepository.findById(id).map(movimiento -> {
+            if (Boolean.TRUE.equals(movimiento.getAnulado())) {
+                throw new RuntimeException("No se puede cobrar un movimiento anulado.");
+            }
+            if (Boolean.TRUE.equals(movimiento.getRechazado())) {
+                throw new RuntimeException("No se puede cobrar un cheque rechazado.");
+            }
+            if (Boolean.TRUE.equals(movimiento.getCobrado())) {
+                return movimiento; // Ya está cobrado, no hacemos nada
+            }
             movimiento.setCobrado(true);
             return movimientoRepository.save(movimiento);
         });
@@ -145,7 +158,15 @@ public class TesoreriaService {
     @Transactional
     public Optional<MovimientoTesoreria> rechazarCheque(Long id, BigDecimal gastosBancarios) {
         return movimientoRepository.findById(id).map(movimiento -> {
-            // 1. Marcar como rechazado
+            // 1. Idempotencia: Si ya está rechazado, devolvemos el movimiento sin hacer nada
+            if (Boolean.TRUE.equals(movimiento.getRechazado())) {
+                return movimiento;
+            }
+            if (Boolean.TRUE.equals(movimiento.getAnulado())) {
+                throw new RuntimeException("No se puede rechazar un movimiento anulado.");
+            }
+
+            // Marcar como rechazado
             movimiento.setRechazado(true);
             movimientoRepository.save(movimiento);
 

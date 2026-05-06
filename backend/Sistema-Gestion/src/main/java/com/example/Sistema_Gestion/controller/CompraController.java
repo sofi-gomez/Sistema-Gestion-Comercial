@@ -1,10 +1,14 @@
 package com.example.Sistema_Gestion.controller;
 
+import com.example.Sistema_Gestion.dto.CompraResumenDTO;
 import com.example.Sistema_Gestion.model.Compra;
 import com.example.Sistema_Gestion.service.CompraService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/compras")
@@ -32,9 +36,12 @@ public class CompraController {
     }
 
     @GetMapping("/proveedor/{proveedorId}")
-    public java.util.List<Compra> listarPorProveedor(@PathVariable("proveedorId") Long proveedorId) {
-        log.info("Listando compras del proveedor ID: {}", proveedorId);
-        return compraService.listarPorProveedor(proveedorId);
+    public org.springframework.data.domain.Page<CompraResumenDTO> listarPorProveedor(
+            @PathVariable("proveedorId") Long proveedorId,
+            @org.springframework.data.web.PageableDefault(size = 20, sort = "fecha", direction = org.springframework.data.domain.Sort.Direction.DESC) org.springframework.data.domain.Pageable pageable) {
+        log.info("Listando compras paginadas del proveedor ID: {}", proveedorId);
+        return compraService.listarPorProveedorPaginado(proveedorId, pageable)
+                .map(CompraResumenDTO::new);
     }
 
     @DeleteMapping("/{id}")

@@ -15,6 +15,8 @@ public interface CompraRepository extends JpaRepository<Compra, Long> {
     @Query("SELECT COALESCE(MAX(c.numero), 0) FROM Compra c")
     Long findMaxNumero();
 
+    org.springframework.data.domain.Page<Compra> findByProveedorId(Long proveedorId, org.springframework.data.domain.Pageable pageable);
+
     List<Compra> findByProveedorIdOrderByFechaDesc(Long proveedorId);
 
     List<Compra> findByProveedorIdAndEstadoOrderByFechaDesc(Long proveedorId, String estado);

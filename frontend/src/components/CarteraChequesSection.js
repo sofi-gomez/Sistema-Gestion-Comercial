@@ -12,6 +12,7 @@ export default function CarteraChequesSection() {
     const [searchTerm, setSearchTerm] = useState("");
     const [checkFilter, setCheckFilter] = useState("all"); // "all", "cobrados", "listos", "urgentes"
     const [sortOrder, setSortOrder] = useState("desc"); // "asc" o "desc"
+    const [procesandoId, setProcesandoId] = useState(null);
     const navigate = useNavigate();
 
     const handleRefClick = async (refStr, targetTab = null) => {
@@ -57,9 +58,13 @@ export default function CarteraChequesSection() {
         try {
             const res = await apiFetch(`${API_BASE}`);
             const data = await res.json();
-            // Filtrar solo medios de pago CHEQUE o CHEQUE_ELECTRONICO y que NO estén anulados ni RECHAZADOS (o mostrarlos con badge)
+            // Filtrar solo medios de pago CHEQUE o CHEQUE_ELECTRONICO que NO estén anulados
+            // Incluimos INGRESOS (cheques de clientes) y EGRESOS que tengan número (cheques emitidos a proveedores)
+            // Esto excluye las reversiones contables de rechazos que son EGRESOS sin número.
             const filtrados = (data || []).filter(m =>
-                (m.medioPago === 'CHEQUE' || m.medioPago === 'CHEQUE_ELECTRONICO') && !m.anulado
+                (m.medioPago === 'CHEQUE' || m.medioPago === 'CHEQUE_ELECTRONICO') && 
+                !m.anulado &&
+                (m.tipo === 'INGRESO' || (m.tipo === 'EGRESO' && m.numeroCheque))
             );
             setCheques(filtrados);
         } catch (err) {
@@ -92,15 +97,24 @@ export default function CarteraChequesSection() {
     };
 
     const handleCobrar = async (id) => {
+        if (procesandoId) return;
+        setProcesandoId(id);
         try {
             const res = await apiFetch(`${API_BASE}/${id}/cobrar`, { method: "PUT" });
             if (res.ok) fetchCheques();
-        } catch (err) { alert("Error al marcar como cobrado"); }
+        } catch (err) { 
+            alert("Error al marcar como cobrado"); 
+        } finally {
+            setProcesandoId(null);
+        }
     };
 
     const handleRechazar = async (id) => {
+        if (procesandoId) return;
         const gastos = prompt("¿Desea marcar este cheque como RECHAZADO? Se generará una Nota de Débito automática al cliente.\n\nIngrese gastos bancarios si aplica:", "0");
         if (gastos === null) return;
+        
+        setProcesandoId(id);
         try {
             const res = await apiFetch(`${API_BASE}/${id}/rechazar`, { 
                 method: "PUT",
@@ -112,7 +126,11 @@ export default function CarteraChequesSection() {
             } else {
                 alert("Error al rechazar cheque");
             }
-        } catch (err) { alert("Error de conexión"); }
+        } catch (err) { 
+            alert("Error de conexión"); 
+        } finally {
+            setProcesandoId(null);
+        }
     };
 
     const filtered = cheques.filter(c => {
@@ -249,22 +267,36 @@ export default function CarteraChequesSection() {
                                 const fVenc = parts ? new Date(parts[0], parts[1] - 1, parts[2]) : null;
                                 const vencido = fVenc && fVenc < new Date();
                                 return (
-                                    <tr key={c.id}>
+                                    <tr key={c.id} style={c.rechazado ? { backgroundColor: '#fff1f1', opacity: 0.9 } : {}}>
                                         <td>
-                                            <span className={`status-badge ${c.rechazado ? 'inactive' : c.cobrado ? 'active' : vencido ? 'inactive' : 'warning'}`}>
+                                            <span 
+                                                className={`status-badge ${c.rechazado ? 'danger' : c.cobrado ? 'active' : vencido ? 'inactive' : 'warning'}`}
+                                                style={c.rechazado ? { background: '#ef4444', color: 'white', fontWeight: 'bold', fontSize: '0.75rem' } : {}}
+                                            >
                                                 {c.rechazado ? 'RECHAZADO' : c.cobrado ? 'Cobrado' : vencido ? 'Vencido' : 'En Cartera'}
                                             </span>
                                         </td>
-                                        <td>{formatDateLocal(c.fechaVencimiento)}</td>
-                                        <td>{c.banco || '-'}</td>
-                                        <td className="sku-cell"><span className="sku-badge">#{c.numeroCheque || '-'}</span></td>
-                                        <td className="price-cell" style={{ fontWeight: 'bold' }}>${c.importe?.toLocaleString()}</td>
-                                        <td>
+                                        <td style={c.rechazado ? { color: '#94a3b8', textDecoration: 'line-through' } : {}}>{formatDateLocal(c.fechaVencimiento)}</td>
+                                        <td style={c.rechazado ? { color: '#94a3b8' } : {}}>{c.banco || '-'}</td>
+                                        <td className="sku-cell">
+                                            <span className="sku-badge" style={c.rechazado ? { background: '#f1f5f9', color: '#94a3b8', textDecoration: 'line-through' } : {}}>
+                                                #{c.numeroCheque || '-'}
+                                            </span>
+                                        </td>
+                                        <td className="price-cell" style={{ fontWeight: 'bold', color: c.rechazado ? '#ef4444' : 'inherit', textDecoration: c.rechazado ? 'line-through' : 'none' }}>
+                                            ${c.importe?.toLocaleString()}
+                                        </td>
+                                        <td style={c.rechazado ? { color: '#94a3b8', textDecoration: 'line-through' } : {}}>
                                             {c.referencia && !c.anulado ? (
                                                 <span 
-                                                    onClick={() => handleRefClick(c.referencia)}
-                                                    style={{ color: "var(--primary)", textDecoration: "underline", cursor: "pointer", fontWeight: "500" }}
-                                                    title="Ver perfil del cliente / emisor"
+                                                    onClick={() => !c.rechazado && handleRefClick(c.referencia)}
+                                                    style={{ 
+                                                        color: c.rechazado ? "#94a3b8" : "var(--primary)", 
+                                                        textDecoration: "underline", 
+                                                        cursor: c.rechazado ? "default" : "pointer", 
+                                                        fontWeight: "500" 
+                                                    }}
+                                                    title={c.rechazado ? "" : "Ver perfil del cliente / emisor"}
                                                 >
                                                     {c.librador || "-"}
                                                 </span>
@@ -275,13 +307,28 @@ export default function CarteraChequesSection() {
                                         <td>
                                             {!c.cobrado && !c.rechazado && (
                                                 <div style={{ display: "flex", gap: "8px" }}>
-                                                    <button onClick={() => handleCobrar(c.id)} className="btn-secondary" style={{ padding: "4px 8px", fontSize: "0.8rem", background: "#10b981", color: "white", border: "none" }}>
-                                                        <FiCheck /> Cobrar
+                                                    <button 
+                                                        disabled={!!procesandoId}
+                                                        onClick={() => handleCobrar(c.id)} 
+                                                        className="btn-secondary" 
+                                                        style={{ padding: "4px 8px", fontSize: "0.8rem", background: procesandoId === c.id ? "#ccc" : "#10b981", color: "white", border: "none", cursor: procesandoId ? "not-allowed" : "pointer" }}
+                                                    >
+                                                        <FiCheck /> {procesandoId === c.id ? '...' : 'Cobrar'}
                                                     </button>
-                                                    <button onClick={() => handleRechazar(c.id)} className="btn-secondary" style={{ padding: "4px 8px", fontSize: "0.8rem", background: "#ef4444", color: "white", border: "none" }}>
-                                                        <FiAlertCircle /> Rechazar
+                                                    <button 
+                                                        disabled={!!procesandoId}
+                                                        onClick={() => handleRechazar(c.id)} 
+                                                        className="btn-secondary" 
+                                                        style={{ padding: "4px 8px", fontSize: "0.8rem", background: procesandoId === c.id ? "#ccc" : "#ef4444", color: "white", border: "none", cursor: procesandoId ? "not-allowed" : "pointer" }}
+                                                    >
+                                                        <FiAlertCircle /> {procesandoId === c.id ? '...' : 'Rechazar'}
                                                     </button>
                                                 </div>
+                                            )}
+                                            {c.rechazado && (
+                                                <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: '600', fontStyle: 'italic' }}>
+                                                    Operación Finalizada
+                                                </span>
                                             )}
                                         </td>
                                     </tr>

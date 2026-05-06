@@ -7,6 +7,7 @@ import {
 import ProveedoresFormModal from "../components/ProveedoresFormModal";
 import CompraFormModal from "../components/CompraFormModal";
 import PagoProveedorFormModal from "../components/PagoProveedorFormModal";
+import NotaCreditoProveedorModal from "../components/NotaCreditoProveedorModal";
 import ProveedorCtaCteSection from "../components/ProveedorCtaCteSection";
 import ProveedorComprasSection from "../components/ProveedorComprasSection";
 import ReporteProveedorTab from "../components/ReporteProveedorTab";
@@ -22,6 +23,7 @@ export default function ProveedoresPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [compraModalOpen, setCompraModalOpen] = useState(false);
   const [pagoModalOpen, setPagoModalOpen] = useState(false);
+  const [notaModalOpen, setNotaModalOpen] = useState(false);
   const [selectedProv, setSelectedProv] = useState(null);
   const [viewDetail, setViewDetail] = useState(false);
   const [activeTab, setActiveTab] = useState("compras");
@@ -157,6 +159,9 @@ export default function ProveedoresPage() {
                 </button>
                 <button className="btn-modern danger" style={{ background: "#e11d48", color: "white" }} onClick={() => setPagoModalOpen(true)}>
                   <FiDollarSign /> Registrar Pago
+                </button>
+                <button className="btn-modern warning" style={{ background: "#f59e0b", color: "white" }} onClick={() => setNotaModalOpen(true)}>
+                  <FiFileText /> Nota de Crédito
                 </button>
                 <button className="icon-btn edit" onClick={() => setModalOpen(true)} title="Editar Proveedor">
                   <FiEdit2 />
@@ -340,6 +345,23 @@ export default function ProveedoresPage() {
             setToast({
               title: pagoParaEditar ? "Pago actualizado" : "Pago registrado",
               message: pagoParaEditar ? "Los cambios se guardaron correctamente." : "El pago al proveedor se ha guardado correctamente.",
+              type: "success"
+            });
+          }}
+        />
+      )}
+
+      {notaModalOpen && (
+        <NotaCreditoProveedorModal
+          proveedor={selectedProv}
+          onClose={() => setNotaModalOpen(false)}
+          onSaved={() => {
+            setNotaModalOpen(false);
+            fetchAll();
+            setRefreshKey(prev => prev + 1);
+            setToast({
+              title: "Nota de Crédito registrada",
+              message: "El ajuste financiero se procesó correctamente y se descontó de la deuda.",
               type: "success"
             });
           }}

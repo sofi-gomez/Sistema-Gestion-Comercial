@@ -12,16 +12,33 @@ export default function ProveedorComprasSection({ proveedorId, refreshKey, onRef
     const [expandedRows, setExpandedRows] = useState(new Set());
     const [editingCompra, setEditingCompra] = useState(null);
     const [busqueda, setBusqueda] = useState("");
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
 
-    const fetchCompras = async () => {
-        setLoading(true);
+    const fetchCompras = async (resetPage = true) => {
+        if (resetPage) {
+            setLoading(true);
+            setPage(0);
+        } else {
+            setLoadingMore(true);
+        }
+
         try {
-            const res = await apiFetch(`${API_COMPRAS}/proveedor/${proveedorId}`);
-            if (res.ok) setCompras(await res.json() || []);
+            const currentPage = resetPage ? 0 : page + 1;
+            const res = await apiFetch(`${API_COMPRAS}/proveedor/${proveedorId}?page=${currentPage}&size=20&sort=fecha,desc`);
+            if (res.ok) {
+                const data = await res.json();
+                const newItems = data.content || [];
+                setCompras(prev => resetPage ? newItems : [...prev, ...newItems]);
+                setHasMore(!data.last);
+                if (!resetPage) setPage(currentPage);
+            }
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
     };
 
@@ -218,6 +235,19 @@ export default function ProveedorComprasSection({ proveedorId, refreshKey, onRef
                     )
                 )}
             </div>
+
+            {hasMore && (
+                <div style={{ display: "flex", justifyContent: "center", marginTop: "15px", marginBottom: "20px" }}>
+                    <button 
+                        onClick={() => fetchCompras(false)}
+                        className="btn-modern secondary"
+                        disabled={loadingMore}
+                        style={{ padding: "8px 20px", fontSize: "0.85rem", fontWeight: "600" }}
+                    >
+                        {loadingMore ? "Cargando..." : "Cargar más compras..."}
+                    </button>
+                </div>
+            )}
 
             {editingCompra && (
                 <CompraFormModal

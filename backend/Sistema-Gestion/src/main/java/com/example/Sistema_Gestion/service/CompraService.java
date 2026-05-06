@@ -134,6 +134,10 @@ public class CompraService {
         return compraRepository.findByProveedorIdOrderByFechaDesc(proveedorId);
     }
 
+    public org.springframework.data.domain.Page<Compra> listarPorProveedorPaginado(Long proveedorId, org.springframework.data.domain.Pageable pageable) {
+        return compraRepository.findByProveedorId(proveedorId, pageable);
+    }
+
     @Transactional
     public void eliminarCompra(Long id) {
         compraRepository.findById(id).ifPresent(compra -> {

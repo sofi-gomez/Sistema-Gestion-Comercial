@@ -16,6 +16,9 @@ export default function CajaDiariaSection() {
     const [tipoFilter, setTipoFilter] = useState("all"); // "all", "INGRESO", "EGRESO"
     const [sortOrder, setSortOrder] = useState("desc"); // "asc" o "desc"
     const [mostrarAnulados, setMostrarAnulados] = useState(false);
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const navigate = useNavigate();
 
     const cleanDescription = (desc, entidad) => {
@@ -32,19 +35,34 @@ export default function CajaDiariaSection() {
         return cleaned.trim() || desc;
     };
 
-    const fetchAll = useCallback(async () => {
-        setLoading(true);
+    const fetchAll = useCallback(async (resetPage = true) => {
+        if (resetPage) {
+            setLoading(true);
+            setPage(0);
+        } else {
+            setLoadingMore(true);
+        }
+
         try {
-            const res = await apiFetch(`${API_BASE}`);
+            const currentPage = resetPage ? 0 : page + 1;
+            const res = await apiFetch(`${API_BASE}?page=${currentPage}&size=50&sort=fecha,${sortOrder}`);
             const data = await res.json();
-            setMovimientos(data || []);
+            
+            if (resetPage) {
+                setMovimientos(data.content || []);
+            } else {
+                setMovimientos(prev => [...prev, ...(data.content || [])]);
+                setPage(currentPage);
+            }
+            setHasMore(!data.last);
         } catch (err) {
             console.error(err);
-            setMovimientos([]);
+            if (resetPage) setMovimientos([]);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
-    }, []);
+    }, [page, sortOrder]);
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -286,6 +304,19 @@ export default function CajaDiariaSection() {
                     </table>
                 )}
             </div>
+
+            {hasMore && (
+                <div style={{ display: "flex", justifyContent: "center", marginTop: "20px", marginBottom: "40px" }}>
+                    <button 
+                        onClick={() => fetchAll(false)} 
+                        className="btn-modern secondary"
+                        disabled={loadingMore}
+                        style={{ padding: "10px 24px", fontWeight: "600", fontSize: "0.9rem" }}
+                    >
+                        {loadingMore ? "Cargando..." : "Cargar más movimientos..."}
+                    </button>
+                </div>
+            )}
 
             {modalOpen && <MovimientoFormModal onClose={() => setModalOpen(false)} onSaved={handleSaved} movimientoEditar={movimientoEditar} />}
         </div>
