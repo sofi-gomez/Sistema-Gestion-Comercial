@@ -35,7 +35,7 @@ export default function ProveedoresPage() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch(API);
+      const res = await apiFetch(`${API}/con-saldo`);
       setProveedores(await res.json() || []);
     } catch (e) { setProveedores([]); }
     finally { setLoading(false); }
@@ -230,12 +230,28 @@ export default function ProveedoresPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(p => (
-                      <tr key={p.id}>
+                    {filtered.map(p => {
+                      const tieneDeudaARS = p.deudaARS != null && Number(p.deudaARS) > 0.01;
+                      const tieneDeudaUSD = p.deudaUSD != null && Number(p.deudaUSD) > 0.01;
+                      const tieneDeuda = tieneDeudaARS || tieneDeudaUSD;
+                      return (
+                      <tr key={p.id} style={tieneDeuda ? { borderLeft: "3px solid #e11d48", background: "#fff5f5" } : { borderLeft: "3px solid transparent" }}>
                         <td>
                           <div className="product-info">
                             <h4>{p.nombre}</h4>
-                            <span className="sku-badge" style={{ fontSize: "0.75rem", marginTop: "4px" }}>{p.cuit || "S/C"}</span>
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "4px", alignItems: "center" }}>
+                              <span className="sku-badge" style={{ fontSize: "0.75rem" }}>{p.cuit || "S/C"}</span>
+                              {tieneDeudaARS && (
+                                <span style={{ fontSize: "0.7rem", fontWeight: 700, background: "#fee2e2", color: "#b91c1c", padding: "2px 7px", borderRadius: "10px", whiteSpace: "nowrap" }}>
+                                  ARS ${Number(p.deudaARS).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              )}
+                              {tieneDeudaUSD && (
+                                <span style={{ fontSize: "0.7rem", fontWeight: 700, background: "#fef3c7", color: "#92400e", padding: "2px 7px", borderRadius: "10px", whiteSpace: "nowrap" }}>
+                                  USD ${Number(p.deudaUSD).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td>
@@ -277,7 +293,7 @@ export default function ProveedoresPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>

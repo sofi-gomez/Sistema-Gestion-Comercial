@@ -164,8 +164,9 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
             Object.entries(importesAplicados).forEach(([key, val]) => {
                 const amount = parseFloat(val);
                 if (amount > 0) {
-                    if (key.startsWith("REMITO_")) importesPorRemito[key.replace("REMITO_", "")] = amount;
-                    if (key.startsWith("NOTA_")) importesPorNotaDebito[key.replace("NOTA_", "")] = amount;
+                    const id = parseInt(key.split('_')[1]);
+                    if (key.startsWith("REMITO_")) importesPorRemito[id] = amount;
+                    if (key.startsWith("NOTA_")) importesPorNotaDebito[id] = amount;
                 }
             });
 

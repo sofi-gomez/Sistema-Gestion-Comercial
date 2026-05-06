@@ -37,10 +37,11 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/**").authenticated() // Proteger solo la API
-                        .anyRequest().permitAll()); // Permitir acceso libre al frontend (React)
+                        .requestMatchers("/api/proveedores/dashboard-summary").authenticated()
+                        .requestMatchers("/api/**").authenticated()
+                        .anyRequest().permitAll());
 
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

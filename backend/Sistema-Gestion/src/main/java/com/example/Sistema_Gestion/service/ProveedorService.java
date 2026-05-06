@@ -45,6 +45,29 @@ public class ProveedorService {
         return proveedorRepository.findAll();
     }
 
+    public List<Map<String, Object>> listarTodosConSaldo() {
+        List<Proveedor> todos = proveedorRepository.findAll();
+        return todos.stream().map(p -> {
+            BigDecimal comprasARS = compraRepository.findTotalCompradoARS(p.getId());
+            BigDecimal pagosARS = pagoProveedorRepository.totalPagadoARSPorProveedor(p.getId());
+            BigDecimal comprasUSD = compraRepository.findTotalCompradoUSD(p.getId());
+            BigDecimal pagosUSD = pagoProveedorRepository.totalPagadoUSDPorProveedor(p.getId());
+
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", p.getId());
+            m.put("nombre", p.getNombre());
+            m.put("cuit", p.getCuit());
+            m.put("telefono", p.getTelefono());
+            m.put("email", p.getEmail());
+            m.put("direccion", p.getDireccion());
+            m.put("condicionIva", p.getCondicionIva());
+            m.put("notas", p.getNotas());
+            m.put("deudaARS", comprasARS.subtract(pagosARS));
+            m.put("deudaUSD", comprasUSD.subtract(pagosUSD));
+            return m;
+        }).toList();
+    }
+
     public Proveedor guardar(Proveedor proveedor) {
         // Limpieza de datos
         if (proveedor.getNombre() != null) proveedor.setNombre(proveedor.getNombre().trim());
