@@ -30,6 +30,9 @@ export default function RemitosPage() {
   const [toast, setToast] = useState(null);
   const [metrics, setMetrics] = useState({ ventasHoy: 0, ventasSemana: 0, ventasMes: 0 });
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const navigate = useNavigate();
 
   const handleClientClick = (clienteId, tab = 'remitos') => {
@@ -51,15 +54,30 @@ export default function RemitosPage() {
     setExpandedRows(newExpanded);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (resetPage = true) => {
+    if (resetPage) {
+      setLoading(true);
+      setPage(0);
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
+      const currentPage = resetPage ? 0 : page + 1;
       const [resR, resM] = await Promise.all([
-        apiFetch(API_REMITOS),
-        apiFetch("/api/cobros/dashboard-summary")
+        apiFetch(`${API_REMITOS}?page=${currentPage}&size=50&sort=fecha,desc`),
+        resetPage ? apiFetch("/api/cobros/dashboard-summary") : Promise.resolve(null)
       ]);
 
-      if (resR.ok) setRemitos(await resR.json());
-      if (resM.ok) {
+      if (resR.ok) {
+        const data = await resR.json();
+        const newRemitos = data.content || [];
+        setRemitos(prev => resetPage ? newRemitos : [...prev, ...newRemitos]);
+        setHasMore(!data.last);
+        if (!resetPage) setPage(currentPage);
+      }
+
+      if (resM && resM.ok) {
         const data = await resM.json();
         setMetrics({
           ventasHoy: data.ventasHoy || 0,
@@ -69,6 +87,9 @@ export default function RemitosPage() {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -405,6 +426,18 @@ export default function RemitosPage() {
               </tbody>
             </table>
           </div>
+          {hasMore && (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: "20px", marginBottom: "40px" }}>
+              <button 
+                onClick={() => fetchData(false)} 
+                className="btn-modern secondary"
+                disabled={loadingMore}
+                style={{ padding: "10px 24px", fontWeight: "600", fontSize: "0.9rem" }}
+              >
+                {loadingMore ? "Cargando..." : "Cargar más remitos..."}
+              </button>
+            </div>
+          )}
         </>
       )}
 

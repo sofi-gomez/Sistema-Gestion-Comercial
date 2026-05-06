@@ -28,19 +28,22 @@ public class PagoProveedorService {
     private final TesoreriaService tesoreriaService;
     private final ProveedorRepository proveedorRepository;
     private final ConfiguracionService configuracionService;
+    private final NotaProveedorRepository notaProveedorRepository;
 
     public PagoProveedorService(PagoProveedorRepository pagoProveedorRepository,
             PagoProveedorCompraRepository pagoProveedorCompraRepository,
             CompraRepository compraRepository,
             TesoreriaService tesoreriaService,
             ProveedorRepository proveedorRepository,
-            ConfiguracionService configuracionService) {
+            ConfiguracionService configuracionService,
+            NotaProveedorRepository notaProveedorRepository) {
         this.pagoProveedorRepository = pagoProveedorRepository;
         this.pagoProveedorCompraRepository = pagoProveedorCompraRepository;
         this.compraRepository = compraRepository;
         this.tesoreriaService = tesoreriaService;
         this.proveedorRepository = proveedorRepository;
         this.configuracionService = configuracionService;
+        this.notaProveedorRepository = notaProveedorRepository;
     }
 
     /**
@@ -166,17 +169,21 @@ public class PagoProveedorService {
     public BigDecimal calcularDeudaProveedorARS(Long proveedorId) {
         BigDecimal totalComprado = compraRepository.findTotalCompradoARS(proveedorId);
         BigDecimal totalPagado = pagoProveedorRepository.totalPagadoARSPorProveedor(proveedorId);
+        BigDecimal totalCreditos = notaProveedorRepository.totalCreditosARSPorProveedor(proveedorId);
         totalComprado = totalComprado != null ? totalComprado : BigDecimal.ZERO;
         totalPagado = totalPagado != null ? totalPagado : BigDecimal.ZERO;
-        return totalComprado.subtract(totalPagado);
+        totalCreditos = totalCreditos != null ? totalCreditos : BigDecimal.ZERO;
+        return totalComprado.subtract(totalPagado).subtract(totalCreditos);
     }
 
     public BigDecimal calcularDeudaProveedorUSD(Long proveedorId) {
         BigDecimal totalComprado = compraRepository.findTotalCompradoUSD(proveedorId);
         BigDecimal totalPagado = pagoProveedorRepository.totalPagadoUSDPorProveedor(proveedorId);
+        BigDecimal totalCreditos = notaProveedorRepository.totalCreditosUSDPorProveedor(proveedorId);
         totalComprado = totalComprado != null ? totalComprado : BigDecimal.ZERO;
         totalPagado = totalPagado != null ? totalPagado : BigDecimal.ZERO;
-        return totalComprado.subtract(totalPagado);
+        totalCreditos = totalCreditos != null ? totalCreditos : BigDecimal.ZERO;
+        return totalComprado.subtract(totalPagado).subtract(totalCreditos);
     }
 
     @Transactional

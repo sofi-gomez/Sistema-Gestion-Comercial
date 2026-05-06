@@ -9,6 +9,8 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,8 +39,8 @@ public class RemitoService {
         this.configuracionService = configuracionService;
     }
 
-    public List<Remito> listarTodos() {
-        return remitoRepository.findAll();
+    public Page<Remito> listarTodos(Pageable pageable) {
+        return remitoRepository.findAll(pageable);
     }
 
     public List<Remito> listarPorEstado(Remito.EstadoRemito estado) {

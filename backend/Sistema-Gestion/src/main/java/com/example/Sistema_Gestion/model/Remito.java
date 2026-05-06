@@ -9,7 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "remito")
+@Table(name = "remito", indexes = {
+    @Index(name = "idx_remito_fecha", columnList = "fecha")
+})
 public class Remito {
 
     // Estado del ciclo de vida del remito

@@ -1,8 +1,12 @@
 package com.example.Sistema_Gestion.controller;
 
+import com.example.Sistema_Gestion.dto.RemitoResumenDTO;
 import com.example.Sistema_Gestion.model.Remito;
 import com.example.Sistema_Gestion.service.RemitoService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -14,6 +18,7 @@ import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/remitos")
@@ -27,25 +32,32 @@ public class RemitoController {
     }
 
     @GetMapping
-    public List<Remito> listarTodos() {
-        return remitoService.listarTodos();
+    public Page<RemitoResumenDTO> listarTodos(@PageableDefault(size = 50, sort = "fecha") Pageable pageable) {
+        return remitoService.listarTodos(pageable)
+                .map(RemitoResumenDTO::new);
     }
 
     @GetMapping("/cliente/{clienteId}")
-    public List<Remito> listarPorCliente(@PathVariable("clienteId") Long clienteId) {
-        return remitoService.listarPorCliente(clienteId);
+    public List<RemitoResumenDTO> listarPorCliente(@PathVariable("clienteId") Long clienteId) {
+        return remitoService.listarPorCliente(clienteId).stream()
+                .map(RemitoResumenDTO::new)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/cliente/{clienteId}/pendientes")
-    public List<Remito> listarPendientesPorCliente(@PathVariable("clienteId") Long clienteId) {
-        return remitoService.listarPendientesPorCliente(clienteId);
+    public List<RemitoResumenDTO> listarPendientesPorCliente(@PathVariable("clienteId") Long clienteId) {
+        return remitoService.listarPendientesPorCliente(clienteId).stream()
+                .map(RemitoResumenDTO::new)
+                .collect(Collectors.toList());
     }
 
     @GetMapping(params = "estado")
-    public List<Remito> listarPorEstado(@RequestParam("estado") String estado) {
+    public List<RemitoResumenDTO> listarPorEstado(@RequestParam("estado") String estado) {
         try {
             Remito.EstadoRemito estadoEnum = Remito.EstadoRemito.valueOf(estado.toUpperCase());
-            return remitoService.listarPorEstado(estadoEnum);
+            return remitoService.listarPorEstado(estadoEnum).stream()
+                    .map(RemitoResumenDTO::new)
+                    .collect(Collectors.toList());
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado inválido: " + estado);
         }

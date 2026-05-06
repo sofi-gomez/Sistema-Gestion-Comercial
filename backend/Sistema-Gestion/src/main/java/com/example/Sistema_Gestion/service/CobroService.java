@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +17,6 @@ import java.util.stream.Collectors;
 
 /**
  * Servicio central del flujo de cobros a clientes.
- *
  * Flujo:
  * 1. Cliente llega a pagar → se crea un Cobro
  * 2. El cobro se distribuye entre uno o más remitos (CobroRemito)
@@ -92,7 +90,7 @@ public class CobroService {
             if (saldoUsado.compareTo(BigDecimal.ZERO) > 0) {
                 // El saldo bruto es la cuenta corriente dinámica (negativo = a favor)
                 BigDecimal saldoBruto = calcularSaldoCliente(cobro.getCliente().getId());
-                
+
                 // Calculamos el total de deuda (remitos) que se están cubriendo en ESTE pago
                 BigDecimal totalRemitosCobrados = importesPorRemito != null ? importesPorRemito.values().stream()
                         .filter(i -> i != null)
@@ -101,15 +99,17 @@ public class CobroService {
                 BigDecimal totalNotasCobradas = importesPorNotaDebito != null ? importesPorNotaDebito.values().stream()
                         .filter(i -> i != null)
                         .reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO;
-                
-                // Al saldo bruto le restamos el total de deudas que se están cubriendo en ESTE pago
-                BigDecimal saldoExcluyendoDeudas = saldoBruto.subtract(totalRemitosCobrados).subtract(totalNotasCobradas);
-                
+
+                // Al saldo bruto le restamos el total de deudas que se están cubriendo en ESTE
+                // pago
+                BigDecimal saldoExcluyendoDeudas = saldoBruto.subtract(totalRemitosCobrados)
+                        .subtract(totalNotasCobradas);
+
                 // El disponible es la porción negativa (saldo a favor)
-                BigDecimal saldoDisponible = saldoExcluyendoDeudas.compareTo(BigDecimal.ZERO) < 0 
-                        ? saldoExcluyendoDeudas.abs() 
+                BigDecimal saldoDisponible = saldoExcluyendoDeudas.compareTo(BigDecimal.ZERO) < 0
+                        ? saldoExcluyendoDeudas.abs()
                         : BigDecimal.ZERO;
-                        
+
                 if (saldoUsado.compareTo(saldoDisponible) > 0) {
                     throw new IllegalArgumentException("Saldo a favor insuficiente. Disponible: " + saldoDisponible);
                 }
@@ -204,7 +204,8 @@ public class CobroService {
 
                 if ("SALDO_A_FAVOR".equals(medio.getMedio())) {
                     // No generamos movimiento de tesorería para el saldo virtual.
-                    // Ya validamos y descontamos conceptualmente al no sumarlo al totalCobrado físico.
+                    // Ya validamos y descontamos conceptualmente al no sumarlo al totalCobrado
+                    // físico.
                 } else {
                     // ✅ Crear Movimiento de Tesorería automáticamente para medios reales
                     MovimientoTesoreria mov = new MovimientoTesoreria();
@@ -212,13 +213,14 @@ public class CobroService {
                     mov.setMedioPago(medio.getMedio()); // El modelo CobroMedioPago usa String para medio
                     mov.setImporte(medio.getImporte());
                     mov.setFecha(savedCobro.getFecha().atStartOfDay());
-                    
+
                     // Simplificar descripción: Solo mostrar observaciones manuales
-                    String desc = (medio.getCobro().getObservaciones() != null && !medio.getCobro().getObservaciones().trim().isEmpty())
-                                  ? medio.getCobro().getObservaciones().trim()
-                                  : "Cobro de Cliente";
+                    String desc = (medio.getCobro().getObservaciones() != null
+                            && !medio.getCobro().getObservaciones().trim().isEmpty())
+                                    ? medio.getCobro().getObservaciones().trim()
+                                    : "Cobro de Cliente";
                     mov.setDescripcion(desc);
-                    
+
                     mov.setReferencia("Cobro #" + savedCobro.getId());
                     mov.setEntidad(nombreCliente);
 
@@ -251,18 +253,23 @@ public class CobroService {
         List<MovimientoDto> movimientos = new ArrayList<>();
 
         // 1. Agregar Remitos (Debe)
-        List<Remito> remitos = remitoRepository.findByClienteIdAndEstadoOrderByFechaDesc(clienteId, Remito.EstadoRemito.VALORIZADO);
-        remitos.addAll(remitoRepository.findByClienteIdAndEstadoOrderByFechaDesc(clienteId, Remito.EstadoRemito.COBRADO));
+        List<Remito> remitos = remitoRepository.findByClienteIdAndEstadoOrderByFechaDesc(clienteId,
+                Remito.EstadoRemito.VALORIZADO);
+        remitos.addAll(
+                remitoRepository.findByClienteIdAndEstadoOrderByFechaDesc(clienteId, Remito.EstadoRemito.COBRADO));
         for (Remito r : remitos) {
-            movimientos.add(new MovimientoDto(r.getFecha(), "DEBE", "REMITO", "Remito #" + r.getNumero(), r.getTotal(), r.getId()));
+            movimientos.add(new MovimientoDto(r.getFecha(), "DEBE", "REMITO", "Remito #" + r.getNumero(), r.getTotal(),
+                    r.getId()));
         }
 
         // 2. Agregar Cobros (Haber)
         List<Cobro> cobros = cobroRepository.findByClienteIdOrderByFechaDesc(clienteId);
         for (Cobro c : cobros) {
             if (!c.getAnulado()) {
-                String desc = (c.getObservaciones() != null && !c.getObservaciones().isBlank()) ? c.getObservaciones() : "Cobro registrado";
-                movimientos.add(new MovimientoDto(c.getFecha(), "HABER", "COBRO", desc, c.getTotalCobrado(), c.getId()));
+                String desc = (c.getObservaciones() != null && !c.getObservaciones().isBlank()) ? c.getObservaciones()
+                        : "Cobro registrado";
+                movimientos
+                        .add(new MovimientoDto(c.getFecha(), "HABER", "COBRO", desc, c.getTotalCobrado(), c.getId()));
             }
         }
 
@@ -273,7 +280,8 @@ public class CobroService {
                 String tipoNota = n.getTipo() == Nota.TipoNota.DEBITO ? "Débito" : "Crédito";
                 String motivo = (n.getMotivo() != null && !n.getMotivo().isBlank()) ? n.getMotivo() : "";
                 String desc = "Nota de " + tipoNota + " #" + n.getNumero() + (motivo.isEmpty() ? "" : " - " + motivo);
-                movimientos.add(new MovimientoDto(n.getFecha(), n.getTipo() == Nota.TipoNota.DEBITO ? "DEBE" : "HABER", "NOTA", desc, n.getMonto(), n.getId()));
+                movimientos.add(new MovimientoDto(n.getFecha(), n.getTipo() == Nota.TipoNota.DEBITO ? "DEBE" : "HABER",
+                        "NOTA", desc, n.getMonto(), n.getId()));
             }
         }
 
@@ -281,8 +289,10 @@ public class CobroService {
         return movimientos.stream()
                 .sorted((a, b) -> {
                     int dateComp = b.getFecha().compareTo(a.getFecha());
-                    if (dateComp != 0) return dateComp;
-                    // Mismo día: Remito (3) < Cobro (2) < Nota (1) -> Para que en el reverse del front queden Remito, Cobro, Nota
+                    if (dateComp != 0)
+                        return dateComp;
+                    // Mismo día: Remito (3) < Cobro (2) < Nota (1) -> Para que en el reverse del
+                    // front queden Remito, Cobro, Nota
                     int pA = getPrioridad(a.getOrigen());
                     int pB = getPrioridad(b.getOrigen());
                     return Integer.compare(pB, pA);
@@ -292,10 +302,14 @@ public class CobroService {
 
     private int getPrioridad(String origen) {
         switch (origen) {
-            case "REMITO": return 3;
-            case "COBRO": return 2;
-            case "NOTA": return 1;
-            default: return 0;
+            case "REMITO":
+                return 3;
+            case "COBRO":
+                return 2;
+            case "NOTA":
+                return 1;
+            default:
+                return 0;
         }
     }
 
@@ -310,7 +324,7 @@ public class CobroService {
     public BigDecimal calcularSaldoCliente(Long clienteId) {
         BigDecimal deudaTotal = remitoRepository.totalContabilizadoPorCliente(clienteId);
         BigDecimal totalCobrado = cobroRepository.totalCobradoPorCliente(clienteId);
-        
+
         BigDecimal notasDebito = notaRepository.totalDebitoPorCliente(clienteId);
         BigDecimal notasCredito = notaRepository.totalCreditoPorCliente(clienteId);
 
@@ -334,7 +348,7 @@ public class CobroService {
                 BigDecimal deudaTotalCubierta = cobro.getRemitos().stream()
                         .map(cr -> cr.getRemito().getTotal() != null ? cr.getRemito().getTotal() : BigDecimal.ZERO)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
-                
+
                 BigDecimal excedenteOriginal = sumaAplicadaRemitos.subtract(deudaTotalCubierta);
                 if (excedenteOriginal.compareTo(BigDecimal.ZERO) > 0) {
                     clienteRepository.findById(cobro.getCliente().getId()).ifPresent(cliente -> {
@@ -413,9 +427,11 @@ public class CobroService {
                 .orElseThrow(() -> new RuntimeException("Cobro no encontrado: " + cobroId));
 
         try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument()) {
-            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
+            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(
+                    org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
             doc.addPage(page);
-            org.apache.pdfbox.pdmodel.PDPageContentStream cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page);
+            org.apache.pdfbox.pdmodel.PDPageContentStream cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc,
+                    page);
 
             float w = page.getMediaBox().getWidth();
             float h = page.getMediaBox().getHeight();
@@ -425,10 +441,11 @@ public class CobroService {
             // ----- LOGO -----
             if (logoBytes != null) {
                 try {
-                    org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject logo =
-                            org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject.createFromByteArray(doc, logoBytes, "logo");
+                    org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject logo = org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject
+                            .createFromByteArray(doc, logoBytes, "logo");
                     cs.drawImage(logo, margin, y - 60, 60, 60);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
 
             // ----- ENCABEZADO -----
@@ -456,7 +473,9 @@ public class CobroService {
             // Línea separadora
             y -= 75;
             cs.setLineWidth(1f);
-            cs.moveTo(margin, y); cs.lineTo(w - margin, y); cs.stroke();
+            cs.moveTo(margin, y);
+            cs.lineTo(w - margin, y);
+            cs.stroke();
 
             // ----- EMPRESA -----
             y -= 22;
@@ -492,7 +511,8 @@ public class CobroService {
             y -= 18;
             String clienteNombre = cobro.getCliente() != null ? cobro.getCliente().getNombre() : "—";
             String clienteCuit = (cobro.getCliente() != null && cobro.getCliente().getDocumento() != null)
-                    ? cobro.getCliente().getDocumento() : "—";
+                    ? cobro.getCliente().getDocumento()
+                    : "—";
             drawLabelValue(cs, margin, y, "Cliente:", clienteNombre);
             y -= 16;
             drawLabelValue(cs, margin, y, "CUIT:", clienteCuit);
@@ -500,7 +520,9 @@ public class CobroService {
             // Línea separadora
             y -= 18;
             cs.setLineWidth(0.5f);
-            cs.moveTo(margin, y); cs.lineTo(w - margin, y); cs.stroke();
+            cs.moveTo(margin, y);
+            cs.lineTo(w - margin, y);
+            cs.stroke();
 
             // ----- DETALLE DE VALORES RECIBIDOS -----
             y -= 20;
@@ -513,42 +535,59 @@ public class CobroService {
             // Cabecera tabla
             y -= 20;
             cs.setNonStrokingColor(new java.awt.Color(230, 230, 230));
-            cs.addRect(margin, y - 18, w - 2 * margin, 18); cs.fill();
+            cs.addRect(margin, y - 18, w - 2 * margin, 18);
+            cs.fill();
             cs.setNonStrokingColor(java.awt.Color.BLACK);
             cs.setLineWidth(0.4f);
-            cs.addRect(margin, y - 18, w - 2 * margin, 18); cs.stroke();
+            cs.addRect(margin, y - 18, w - 2 * margin, 18);
+            cs.stroke();
 
             cs.beginText();
             cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
-            cs.newLineAtOffset(margin + 5, y - 13); cs.showText("Medio"); cs.endText();
+            cs.newLineAtOffset(margin + 5, y - 13);
+            cs.showText("Medio");
+            cs.endText();
             cs.beginText();
             cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
-            cs.newLineAtOffset(margin + 120, y - 13); cs.showText("Detalle"); cs.endText();
+            cs.newLineAtOffset(margin + 120, y - 13);
+            cs.showText("Detalle");
+            cs.endText();
             cs.beginText();
             cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
-            cs.newLineAtOffset(w - margin - 80, y - 13); cs.showText("Importe"); cs.endText();
+            cs.newLineAtOffset(w - margin - 80, y - 13);
+            cs.showText("Importe");
+            cs.endText();
 
             y -= 18;
             if (cobro.getMediosPago() != null) {
                 for (com.example.Sistema_Gestion.model.CobroMedioPago mp : cobro.getMediosPago()) {
                     cs.setLineWidth(0.2f);
-                    cs.addRect(margin, y - 16, w - 2 * margin, 16); cs.stroke();
+                    cs.addRect(margin, y - 16, w - 2 * margin, 16);
+                    cs.stroke();
 
                     String rawMedio = mp.getMedio() != null ? mp.getMedio() : "EFECTIVO";
                     String medioLabel = rawMedio;
-                    if ("EFECTIVO".equals(rawMedio)) medioLabel = "Efectivo";
-                    else if ("TRANSFERENCIA".equals(rawMedio)) medioLabel = "Transferencia";
-                    else if ("CHEQUE".equals(rawMedio)) medioLabel = "Cheque";
-                    else if ("CHEQUE_ELECTRONICO".equals(rawMedio)) medioLabel = "E-Cheque";
-                    else if ("MERCADO_PAGO".equals(rawMedio)) medioLabel = "Mercado Pago";
-                    else if ("SALDO_A_FAVOR".equals(rawMedio)) medioLabel = "Saldo a Favor";
+                    if ("EFECTIVO".equals(rawMedio))
+                        medioLabel = "Efectivo";
+                    else if ("TRANSFERENCIA".equals(rawMedio))
+                        medioLabel = "Transferencia";
+                    else if ("CHEQUE".equals(rawMedio))
+                        medioLabel = "Cheque";
+                    else if ("CHEQUE_ELECTRONICO".equals(rawMedio))
+                        medioLabel = "E-Cheque";
+                    else if ("MERCADO_PAGO".equals(rawMedio))
+                        medioLabel = "Mercado Pago";
+                    else if ("SALDO_A_FAVOR".equals(rawMedio))
+                        medioLabel = "Saldo a Favor";
 
                     String detalleLabel = "";
                     if (rawMedio.contains("CHEQUE")) {
                         detalleLabel = "Banco: " + safe(mp.getBanco())
                                 + " | N°: " + safe(mp.getNumeroCheque())
                                 + " | Cobro: " + (mp.getFechaCobro() != null
-                                        ? mp.getFechaCobro().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy")) : "—");
+                                        ? mp.getFechaCobro()
+                                                .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy"))
+                                        : "—");
                     } else if ("TRANSFERENCIA".equals(rawMedio)) {
                         detalleLabel = "Transferencia bancaria";
                     } else if ("SALDO_A_FAVOR".equals(rawMedio)) {
@@ -557,17 +596,24 @@ public class CobroService {
 
                     cs.beginText();
                     cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
-                    cs.newLineAtOffset(margin + 5, y - 11); cs.showText(medioLabel); cs.endText();
+                    cs.newLineAtOffset(margin + 5, y - 11);
+                    cs.showText(medioLabel);
+                    cs.endText();
 
                     cs.beginText();
                     cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 8);
-                    cs.newLineAtOffset(margin + 120, y - 11); cs.showText(detalleLabel); cs.endText();
+                    cs.newLineAtOffset(margin + 120, y - 11);
+                    cs.showText(detalleLabel);
+                    cs.endText();
 
                     String importeStr = "$ " + (mp.getImporte() != null
-                            ? mp.getImporte().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() : "0.00");
+                            ? mp.getImporte().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                            : "0.00");
                     cs.beginText();
                     cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
-                    cs.newLineAtOffset(w - margin - 78, y - 11); cs.showText(importeStr); cs.endText();
+                    cs.newLineAtOffset(w - margin - 78, y - 11);
+                    cs.showText(importeStr);
+                    cs.endText();
 
                     y -= 18;
                 }
@@ -576,20 +622,25 @@ public class CobroService {
             // Total cobrado
             y -= 8;
             cs.setLineWidth(1f);
-            cs.moveTo(margin, y); cs.lineTo(w - margin, y); cs.stroke();
+            cs.moveTo(margin, y);
+            cs.lineTo(w - margin, y);
+            cs.stroke();
             y -= 18;
             cs.beginText();
             cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 12);
             cs.newLineAtOffset(w - margin - 200, y);
             String totalStr = "TOTAL RECIBIDO: $ " + (cobro.getTotalCobrado() != null
-                    ? cobro.getTotalCobrado().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() : "0.00");
+                    ? cobro.getTotalCobrado().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                    : "0.00");
             cs.showText(totalStr);
             cs.endText();
 
             // Línea separadora
             y -= 18;
             cs.setLineWidth(0.5f);
-            cs.moveTo(margin, y); cs.lineTo(w - margin, y); cs.stroke();
+            cs.moveTo(margin, y);
+            cs.lineTo(w - margin, y);
+            cs.stroke();
 
             // ----- IMPUTACIÓN A REMITOS -----
             y -= 20;
@@ -602,25 +653,32 @@ public class CobroService {
             y -= 18;
             if (cobro.getRemitos() != null && !cobro.getRemitos().isEmpty()) {
                 for (com.example.Sistema_Gestion.model.CobroRemito cr : cobro.getRemitos()) {
-                    if (cr.getRemito() == null) continue;
+                    if (cr.getRemito() == null)
+                        continue;
                     cs.setLineWidth(0.2f);
-                    cs.addRect(margin, y - 14, w - 2 * margin, 14); cs.stroke();
+                    cs.addRect(margin, y - 14, w - 2 * margin, 14);
+                    cs.stroke();
                     cs.beginText();
                     cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
                     cs.newLineAtOffset(margin + 5, y - 10);
-                    cs.showText("Remito N° " + cr.getRemito().getNumero()); cs.endText();
+                    cs.showText("Remito N° " + cr.getRemito().getNumero());
+                    cs.endText();
                     String montoImput = "$ " + (cr.getImporte() != null
-                            ? cr.getImporte().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() : "—");
+                            ? cr.getImporte().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                            : "—");
                     cs.beginText();
                     cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
-                    cs.newLineAtOffset(w - margin - 78, y - 10); cs.showText(montoImput); cs.endText();
+                    cs.newLineAtOffset(w - margin - 78, y - 10);
+                    cs.showText(montoImput);
+                    cs.endText();
                     y -= 16;
                 }
             } else {
                 cs.beginText();
                 cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
                 cs.newLineAtOffset(margin + 5, y - 10);
-                cs.showText("Pago a cuenta sin imputación específica"); cs.endText();
+                cs.showText("Pago a cuenta sin imputación específica");
+                cs.endText();
                 y -= 16;
             }
 
@@ -629,21 +687,28 @@ public class CobroService {
                 y -= 10;
                 cs.beginText();
                 cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 9);
-                cs.newLineAtOffset(margin, y); cs.showText("Observaciones: "); cs.endText();
+                cs.newLineAtOffset(margin, y);
+                cs.showText("Observaciones: ");
+                cs.endText();
                 y -= 13;
                 cs.beginText();
                 cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
                 cs.newLineAtOffset(margin + 5, y);
-                cs.showText(safe(cobro.getObservaciones())); cs.endText();
+                cs.showText(safe(cobro.getObservaciones()));
+                cs.endText();
                 y -= 16;
             }
 
             // ----- FIRMA -----
             y -= 40;
-            cs.moveTo(w - margin - 150, y - 2); cs.lineTo(w - margin - 10, y - 2); cs.stroke();
+            cs.moveTo(w - margin - 150, y - 2);
+            cs.lineTo(w - margin - 10, y - 2);
+            cs.stroke();
             cs.beginText();
             cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
-            cs.newLineAtOffset(w - margin - 120, y - 14); cs.showText("Firma / Sello empresa"); cs.endText();
+            cs.newLineAtOffset(w - margin - 120, y - 14);
+            cs.showText("Firma / Sello empresa");
+            cs.endText();
 
             // Pie
             cs.beginText();
@@ -661,15 +726,19 @@ public class CobroService {
             String label, String value) throws Exception {
         cs.beginText();
         cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 10);
-        cs.newLineAtOffset(x, y); cs.showText(label); cs.endText();
+        cs.newLineAtOffset(x, y);
+        cs.showText(label);
+        cs.endText();
         cs.beginText();
         cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 10);
-        cs.newLineAtOffset(x + 60, y); cs.showText(safe(value)); cs.endText();
+        cs.newLineAtOffset(x + 60, y);
+        cs.showText(safe(value));
+        cs.endText();
     }
 
     private String safe(String s) {
-        if (s == null) return "";
+        if (s == null)
+            return "";
         return s.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
     }
 }
-

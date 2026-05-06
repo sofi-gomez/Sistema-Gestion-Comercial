@@ -4,9 +4,11 @@ import com.example.Sistema_Gestion.model.Compra;
 import com.example.Sistema_Gestion.model.CompraItem;
 import com.example.Sistema_Gestion.model.PagoProveedor;
 import com.example.Sistema_Gestion.model.Proveedor;
+import com.example.Sistema_Gestion.model.Nota;
 import com.example.Sistema_Gestion.repository.ProveedorRepository;
 import com.example.Sistema_Gestion.repository.CompraRepository;
 import com.example.Sistema_Gestion.repository.PagoProveedorRepository;
+import com.example.Sistema_Gestion.repository.NotaProveedorRepository;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -32,13 +34,16 @@ public class ProveedorService {
     private final ProveedorRepository proveedorRepository;
     private final CompraRepository compraRepository;
     private final PagoProveedorRepository pagoProveedorRepository;
+    private final NotaProveedorRepository notaProveedorRepository;
 
     public ProveedorService(ProveedorRepository proveedorRepository,
             CompraRepository compraRepository,
-            PagoProveedorRepository pagoProveedorRepository) {
+            PagoProveedorRepository pagoProveedorRepository,
+            NotaProveedorRepository notaProveedorRepository) {
         this.proveedorRepository = proveedorRepository;
         this.compraRepository = compraRepository;
         this.pagoProveedorRepository = pagoProveedorRepository;
+        this.notaProveedorRepository = notaProveedorRepository;
     }
 
     public List<Proveedor> listarTodos() {
@@ -50,8 +55,10 @@ public class ProveedorService {
         return todos.stream().map(p -> {
             BigDecimal comprasARS = compraRepository.findTotalCompradoARS(p.getId());
             BigDecimal pagosARS = pagoProveedorRepository.totalPagadoARSPorProveedor(p.getId());
+            BigDecimal notasARS = notaProveedorRepository.totalCreditosARSPorProveedor(p.getId());
             BigDecimal comprasUSD = compraRepository.findTotalCompradoUSD(p.getId());
             BigDecimal pagosUSD = pagoProveedorRepository.totalPagadoUSDPorProveedor(p.getId());
+            BigDecimal notasUSD = notaProveedorRepository.totalCreditosUSDPorProveedor(p.getId());
 
             Map<String, Object> m = new HashMap<>();
             m.put("id", p.getId());
@@ -62,8 +69,8 @@ public class ProveedorService {
             m.put("direccion", p.getDireccion());
             m.put("condicionIva", p.getCondicionIva());
             m.put("notas", p.getNotas());
-            m.put("deudaARS", comprasARS.subtract(pagosARS));
-            m.put("deudaUSD", comprasUSD.subtract(pagosUSD));
+            m.put("deudaARS", comprasARS.subtract(pagosARS).subtract(notasARS));
+            m.put("deudaUSD", comprasUSD.subtract(pagosUSD).subtract(notasUSD));
             return m;
         }).toList();
     }
@@ -120,12 +127,14 @@ public class ProveedorService {
 
         BigDecimal deudaTotalARS = todos.stream()
                 .map(p -> compraRepository.findTotalCompradoARS(p.getId())
-                        .subtract(pagoProveedorRepository.totalPagadoARSPorProveedor(p.getId())))
+                        .subtract(pagoProveedorRepository.totalPagadoARSPorProveedor(p.getId()))
+                        .subtract(notaProveedorRepository.totalCreditosARSPorProveedor(p.getId())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal deudaTotalUSD = todos.stream()
                 .map(p -> compraRepository.findTotalCompradoUSD(p.getId())
-                        .subtract(pagoProveedorRepository.totalPagadoUSDPorProveedor(p.getId())))
+                        .subtract(pagoProveedorRepository.totalPagadoUSDPorProveedor(p.getId()))
+                        .subtract(notaProveedorRepository.totalCreditosUSDPorProveedor(p.getId())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Map<String, Object> summary = new HashMap<>();
@@ -652,5 +661,43 @@ public class ProveedorService {
             lines.add(text); // Fallback silencioso
         }
         return lines;
+    }
+
+    // ==========================================
+    // NOTAS DE CRÉDITO DE PROVEEDOR
+    // ==========================================
+
+    @org.springframework.transaction.annotation.Transactional
+    public Nota crearNotaProveedor(Long proveedorId, Nota nota) {
+        Proveedor prov = proveedorRepository.findById(proveedorId)
+                .orElseThrow(() -> new RuntimeException("Proveedor no encontrado"));
+        
+        nota.setProveedor(prov);
+        nota.setCliente(null);
+        nota.setTipo(Nota.TipoNota.CREDITO);
+        nota.setEstado(Nota.EstadoNota.PENDIENTE);
+        
+        if (nota.getFecha() == null) {
+            nota.setFecha(LocalDate.now());
+        }
+
+        Long maxNumero = notaProveedorRepository.findMaxNumero();
+        nota.setNumero(maxNumero != null ? maxNumero + 1 : 1);
+
+        return notaProveedorRepository.save(nota);
+    }
+
+    public List<Nota> listarNotasPorProveedor(Long proveedorId) {
+        return notaProveedorRepository.findByProveedorIdAndEstadoNotOrderByFechaDescCreatedAtDesc(
+            proveedorId, Nota.EstadoNota.ANULADA);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void anularNotaProveedor(Long id) {
+        Nota nota = notaProveedorRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Nota no encontrada"));
+        
+        nota.setEstado(Nota.EstadoNota.ANULADA);
+        notaProveedorRepository.save(nota);
     }
 }

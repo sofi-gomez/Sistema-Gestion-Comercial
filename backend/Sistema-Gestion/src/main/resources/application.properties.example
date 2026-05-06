@@ -1,23 +1,26 @@
+# Configuración de Aplicación (Plantilla)
+# Copia este archivo como application.properties y completa tus datos reales
+
 spring.application.name=Sistema-Gestion
 
-# ⚠️ Copiar este archivo como application.properties y completar con valores reales
-spring.datasource.url=jdbc:mysql://localhost:3306/gestion_db?useSSL=false&serverTimezone=UTC
-spring.datasource.username=YOUR_DB_USERNAME
-spring.datasource.password=YOUR_DB_PASSWORD
+# Base de Datos - Usa variables de entorno para mayor seguridad
+spring.datasource.url=jdbc:mysql://${DB_HOST:localhost}:3306/${DB_NAME:gestion_db}?useSSL=false&serverTimezone=UTC
+spring.datasource.username=${DB_USER:root}
+spring.datasource.password=${DB_PASSWORD:tu_password_aqui}
 
+# JPA / Hibernate
 spring.jpa.show-sql=false
-spring.jpa.hibernate.ddl-auto=update
+spring.jpa.hibernate.ddl-auto=validate
 spring.jpa.properties.hibernate.format_sql=true
 spring.jpa.open-in-view=false
 
-# Seguridad
-app.jwt.secret=YOUR_JWT_SECRET_KEY_MIN_32_CHARS
+# Seguridad JWT - ¡CAMBIAR EN PRODUCCIÓN!
+app.jwt.secret=${JWT_SECRET:clave_secreta_de_desarrollo_cambiar_en_produccion}
 
 server.port=8080
 spring.jackson.serialization.fail-on-empty-beans=false
-
 spring.jackson.serialization.write-dates-as-timestamps=false
 spring.jackson.deserialization.fail-on-unknown-properties=false
 
-# Inicialización diferida: acelera el arranque cargando beans solo cuando se necesitan
+# Optimización
 spring.main.lazy-initialization=true

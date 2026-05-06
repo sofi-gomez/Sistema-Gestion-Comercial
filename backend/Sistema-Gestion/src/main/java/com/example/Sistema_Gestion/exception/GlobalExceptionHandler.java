@@ -19,8 +19,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleGlobalException(Exception ex) {
         log.error("Error no controlado: ", ex);
         return ResponseEntity.internalServerError().body(Map.of(
-                "error", "Ocurrió un error inesperado",
-                "message", ex.getMessage() // En producción esto debería ser más genérico
+                "error", "Ocurrió un error inesperado en el servidor",
+                "status", 500
         ));
     }
 

@@ -28,8 +28,10 @@ public class TesoreriaController {
     }
 
     @GetMapping
-    public List<MovimientoTesoreria> listarTodos() {
-        return tesoreriaService.listarTodos();
+    public org.springframework.data.domain.Page<MovimientoTesoreria> listarTodos(
+            @org.springframework.data.web.PageableDefault(size = 50, sort = "fecha", direction = org.springframework.data.domain.Sort.Direction.DESC) org.springframework.data.domain.Pageable pageable) {
+        log.info("Listando movimientos de tesorería paginados");
+        return tesoreriaService.listarTodosPaginado(pageable);
     }
 
     @GetMapping("/{id}")

@@ -6,7 +6,10 @@ import java.time.LocalDateTime;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "movimiento_tesoreria")
+@Table(name = "movimiento_tesoreria", indexes = {
+    @Index(name = "idx_movimiento_referencia", columnList = "referencia"),
+    @Index(name = "idx_movimiento_fecha", columnList = "fecha")
+})
 public class MovimientoTesoreria {
 
     public enum TipoMovimiento {
