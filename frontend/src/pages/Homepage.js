@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     FiPackage, FiUsers, FiFileText, FiTruck, FiDollarSign,
-    FiArrowRight, FiAlertCircle, FiClock, FiCheckSquare, FiTrendingUp, FiCreditCard, FiActivity, FiSettings, FiLogOut
+    FiArrowRight, FiAlertCircle, FiClock, FiCheckSquare, FiTrendingUp, FiCreditCard, FiActivity, FiSettings, FiLogOut, FiUser
 } from "react-icons/fi";
 import "../index.css";
 import { apiFetch } from "../utils/api";
@@ -11,7 +11,7 @@ const API_REMITOS = "/api/remitos";
 const API_TESORERIA = "/api/tesoreria/resumen";
 const API_PRODUCTOS = "/api/productos/dashboard-summary";
 const API_COBROS = "/api/cobros/dashboard-summary";
-const API_PROVEEDORES = "/api/proveedores/dashboard-summary";
+const API_PROVEEDORES = "/api/proveedores";
 
 const modules = [
     { title: "Mercadería", desc: "Productos, stock y movimientos", path: "/mercaderia", icon: <FiPackage />, color: "from-green-500 to-emerald-600" },
@@ -45,7 +45,7 @@ export default function HomePage() {
                     apiFetch(API_TESORERIA),
                     apiFetch(API_PRODUCTOS),
                     apiFetch(API_COBROS),
-                    apiFetch(API_PROVEEDORES)
+                    apiFetch(`${API_PROVEEDORES}/dashboard-summary`)
                 ]);
 
                 const getJson = async (res) => {
@@ -66,7 +66,8 @@ export default function HomePage() {
                     remitosValorizados: remitos.filter(r => r.estado === "VALORIZADO").length,
                     saldoCaja: tesoreria.saldoActual || 0,
                     cuentasPorCobrar: cobros.cuentasPorCobrar || 0,
-                    cuentasPorPagar: proveedores.cuentasPorPagar || 0,
+                    cuentasPorPagarARS: proveedores.cuentasPorPagarARS || 0,
+                    cuentasPorPagarUSD: proveedores.cuentasPorPagarUSD || 0,
                     stockCritico: productos.stockCritico || 0,
                     proximosAVencer: productos.proximosAVencer || 0,
                     ventasSemana: cobros.ventasSemana || 0,
@@ -109,17 +110,17 @@ export default function HomePage() {
                         </div>
 
                         <div className="kpi-card" onClick={() => navigate("/proveedores")}>
-                            <div className="kpi-icon-wrapper rose"><FiCreditCard /></div>
-                            <div className="kpi-info" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div className="kpi-icon-wrapper red"><FiUser /></div>
+                            <div className="kpi-info">
                                 <p className="kpi-label">Cuentas por Pagar</p>
-                                <h3 className="kpi-value text-rose-600" style={{ fontSize: '1.25rem' }}>
-                                    ${(stats.cuentasPorPagarARS !== undefined ? stats.cuentasPorPagarARS : stats.cuentasPorPagar).toLocaleString()}
-                                </h3>
-                                {(stats.cuentasPorPagarUSD > 0 || stats.cuentasPorPagarUSD < 0) && (
-                                    <h3 className="kpi-value" style={{ fontSize: '1rem', color: '#059669' }}>
-                                        U$D {stats.cuentasPorPagarUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                <div className="kpi-dual-values">
+                                    <h3 className="kpi-value text-red-600">
+                                        <small className="currency-label">ARS</small> ${stats.cuentasPorPagarARS?.toLocaleString()}
                                     </h3>
-                                )}
+                                    <h3 className="kpi-value text-red-400">
+                                        <small className="currency-label">USD</small> ${stats.cuentasPorPagarUSD?.toLocaleString()}
+                                    </h3>
+                                </div>
                             </div>
                         </div>
 

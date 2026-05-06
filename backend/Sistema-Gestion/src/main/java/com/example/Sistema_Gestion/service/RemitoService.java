@@ -153,11 +153,23 @@ public class RemitoService {
      */
     @Transactional
     public void actualizarEstadoPostCobro(Remito remito, BigDecimal totalCobradoEnRemito) {
-        if (remito.getTotal() != null
-                && totalCobradoEnRemito.compareTo(remito.getTotal()) >= 0) {
+        if (remito.getTotal() == null) return;
+
+        // Tolerancia de 0.01 para evitar problemas de redondeo
+        BigDecimal totalRemito = remito.getTotal();
+        BigDecimal diferencia = totalRemito.subtract(totalCobradoEnRemito);
+
+        if (diferencia.compareTo(new BigDecimal("0.01")) <= 0) {
             remito.setEstado(Remito.EstadoRemito.COBRADO);
-            remitoRepository.save(remito);
+            remitoRepository.saveAndFlush(remito);
+        } else {
+            remito.setEstado(Remito.EstadoRemito.VALORIZADO);
+            remitoRepository.saveAndFlush(remito);
         }
+    }
+
+    public List<Remito> listarPendientesPorCliente(Long clienteId) {
+        return remitoRepository.findByClienteIdAndEstadoOrderByFechaDesc(clienteId, Remito.EstadoRemito.VALORIZADO);
     }
 
     @Transactional

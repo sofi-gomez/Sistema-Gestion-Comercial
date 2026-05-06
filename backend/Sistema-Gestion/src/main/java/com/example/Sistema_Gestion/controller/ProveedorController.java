@@ -28,6 +28,11 @@ public class ProveedorController {
         return proveedorService.listarTodos();
     }
 
+    @GetMapping("/con-saldo")
+    public ResponseEntity<?> listarConSaldo() {
+        return ResponseEntity.ok(proveedorService.listarTodosConSaldo());
+    }
+
     @PostMapping
     public Proveedor crear(@Valid @RequestBody Proveedor proveedor) {
         log.info("Creando nuevo proveedor: {}", proveedor.getNombre());

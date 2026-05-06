@@ -36,6 +36,11 @@ public class RemitoController {
         return remitoService.listarPorCliente(clienteId);
     }
 
+    @GetMapping("/cliente/{clienteId}/pendientes")
+    public List<Remito> listarPendientesPorCliente(@PathVariable("clienteId") Long clienteId) {
+        return remitoService.listarPendientesPorCliente(clienteId);
+    }
+
     @GetMapping(params = "estado")
     public List<Remito> listarPorEstado(@RequestParam("estado") String estado) {
         try {
