@@ -96,8 +96,6 @@ git clone https://github.com/sofi-gomez/Sistema-Gestion-Comercial.git
 ## 👤 Autoras
 
 **Sofia Gutierrez, Guadalupe Aban, Sonia Guevara, Guadalupe Dominguez y Sofía Gómez**
-- Empresa: Leonel Gómez - Agro-Ferretería
-- Ubicación: Argentina
 
 ⭐ Si este proyecto te fue útil, considera darle una estrella en GitHub
 
