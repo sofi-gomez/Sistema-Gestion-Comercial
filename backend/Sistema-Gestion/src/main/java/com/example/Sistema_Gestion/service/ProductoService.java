@@ -40,10 +40,13 @@ public class ProductoService {
         if (producto.getSku() != null) producto.setSku(producto.getSku().trim());
         if (producto.getNombre() != null) producto.setNombre(producto.getNombre().trim());
 
-        // Verificación de duplicados (Evitar 500 genérico de DB)
+        // Verificación de SKU duplicado — excluye el propio producto al editar
         if (producto.getSku() != null && !producto.getSku().isEmpty()) {
             productoRepository.findBySku(producto.getSku()).ifPresent(p -> {
-                throw new RuntimeException("El SKU '" + producto.getSku() + "' ya está en uso por el producto: " + p.getNombre());
+                // Si el ID es distinto, es un conflicto real con otro producto
+                if (!p.getId().equals(producto.getId())) {
+                    throw new RuntimeException("El SKU '" + producto.getSku() + "' ya está en uso por el producto: " + p.getNombre());
+                }
             });
         }
         

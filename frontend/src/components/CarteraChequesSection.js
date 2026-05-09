@@ -56,12 +56,14 @@ export default function CarteraChequesSection() {
     const fetchCheques = async () => {
         setLoading(true);
         try {
-            const res = await apiFetch(`${API_BASE}`);
+            // Pedimos una cantidad grande (500) para asegurarnos de traer todos los cheques activos
+            const res = await apiFetch(`${API_BASE}?size=500&sort=fecha,desc`);
             const data = await res.json();
-            // Filtrar solo medios de pago CHEQUE o CHEQUE_ELECTRONICO que NO estén anulados
-            // Incluimos INGRESOS (cheques de clientes) y EGRESOS que tengan número (cheques emitidos a proveedores)
-            // Esto excluye las reversiones contables de rechazos que son EGRESOS sin número.
-            const filtrados = (data || []).filter(m =>
+            
+            // Como el endpoint ahora es paginado, los datos vienen en data.content
+            const listaMovimientos = data.content || [];
+            
+            const filtrados = listaMovimientos.filter(m =>
                 (m.medioPago === 'CHEQUE' || m.medioPago === 'CHEQUE_ELECTRONICO') && 
                 !m.anulado &&
                 (m.tipo === 'INGRESO' || (m.tipo === 'EGRESO' && m.numeroCheque))

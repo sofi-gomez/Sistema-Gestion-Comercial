@@ -64,7 +64,7 @@ export default function CajaDiariaSection() {
         }
     }, [page, sortOrder]);
 
-    useEffect(() => { fetchAll(); }, [fetchAll]);
+    useEffect(() => { fetchAll(true); }, [sortOrder]);
 
     const handleSaved = () => { setModalOpen(false); setMovimientoEditar(null); fetchAll(); };
 
