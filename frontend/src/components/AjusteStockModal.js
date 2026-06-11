@@ -5,12 +5,14 @@ import { apiFetch } from "../utils/api";
 export default function AjusteStockModal({ producto, onClose, onSave }) {
     const [cantidad, setCantidad] = useState(1);
     const [tipo, setTipo] = useState("SUMAR"); // SUMAR o RESTAR
-    const [motivo, setMotivo] = useState("");
+    const [motivoSeleccionado, setMotivoSeleccionado] = useState("");
+    const [motivoCustom, setMotivoCustom] = useState("");
     const [saving, setSaving] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!motivo.trim()) {
+        const motivoFinal = motivoSeleccionado === "Otro" ? ("Otro: " + motivoCustom) : motivoSeleccionado;
+        if (!motivoFinal.trim() || (motivoSeleccionado === "Otro" && !motivoCustom.trim())) {
             alert("Por favor, ingrese un motivo para el ajuste.");
             return;
         }
@@ -24,7 +26,7 @@ export default function AjusteStockModal({ producto, onClose, onSave }) {
                 body: JSON.stringify({
                     productoId: producto.id,
                     cantidad: finalCantidad,
-                    motivo: motivo
+                    motivo: motivoFinal
                 })
             });
 
@@ -102,8 +104,8 @@ export default function AjusteStockModal({ producto, onClose, onSave }) {
                             <label className="form-label">Motivo del Ajuste</label>
                             <select 
                                 className="modern-input"
-                                value={motivo}
-                                onChange={e => setMotivo(e.target.value)}
+                                value={motivoSeleccionado}
+                                onChange={e => setMotivoSeleccionado(e.target.value)}
                                 required
                             >
                                 <option value="">Seleccione un motivo...</option>
@@ -116,14 +118,17 @@ export default function AjusteStockModal({ producto, onClose, onSave }) {
                             </select>
                         </div>
                         
-                        {motivo === "Otro" && (
+                        {motivoSeleccionado === "Otro" && (
                              <div className="form-group">
                                 <label className="form-label">Descripción</label>
                                 <textarea 
                                     className="modern-input"
                                     placeholder="Explique el motivo..."
-                                    onChange={e => setMotivo("Otro: " + e.target.value)}
+                                    value={motivoCustom}
+                                    onChange={e => setMotivoCustom(e.target.value)}
+                                    rows={3}
                                     required
+                                    autoFocus
                                 />
                              </div>
                         )}
