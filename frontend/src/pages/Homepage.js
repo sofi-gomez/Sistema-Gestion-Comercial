@@ -202,7 +202,7 @@ export default function HomePage() {
 
             <footer className="home-footer">
                 <div className="footer-content">
-                    <p>© {new Date().getFullYear()} Leonel Gomez — Agro-Ferretería</p>
+                    <p>© {new Date().getFullYear()} Gea Agrícola </p>
                     <p className="footer-tagline">NUESTRAS PLANTAS NUNCA DUERMEN</p>
                 </div>
             </footer>
