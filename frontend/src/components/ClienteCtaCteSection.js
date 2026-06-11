@@ -47,6 +47,28 @@ export default function ClienteCtaCteSection({ clienteId }) {
         }
     };
 
+    const downloadNota = async (notaId) => {
+        try {
+            const res = await apiFetch(`/api/notas/${notaId}/pdf`);
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `nota_${notaId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            } else {
+                alert("Error al descargar la nota");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error de conexión");
+        }
+    };
+
     const fetchCtaCte = useCallback(async () => {
         setLoading(true);
         try {
@@ -246,6 +268,28 @@ export default function ClienteCtaCteSection({ clienteId }) {
                                                     }}
                                                 >
                                                     <FiTrash2 /> Anular
+                                                </button>
+                                            </div>
+                                        )}
+                                        {m.origen === "NOTA" && (
+                                            <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                                                <button
+                                                    className="btn-modern secondary"
+                                                    style={{ 
+                                                        padding: "6px 10px", 
+                                                        color: "#f97316", 
+                                                        background: "#fff7ed",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "6px",
+                                                        fontSize: "0.8rem",
+                                                        fontWeight: "600",
+                                                        border: "1px solid #fed7aa"
+                                                    }}
+                                                    title="Descargar Nota PDF"
+                                                    onClick={() => downloadNota(m.idReferencia)}
+                                                >
+                                                    <FiDownload />
                                                 </button>
                                             </div>
                                         )}

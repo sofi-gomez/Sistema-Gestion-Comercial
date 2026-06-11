@@ -37,6 +37,30 @@ public class NotaController {
         );
     }
 
+    @GetMapping("/{id}/pdf")
+    public org.springframework.http.ResponseEntity<byte[]> descargarPdf(@PathVariable Long id) {
+        try {
+            byte[] logo = null;
+            try {
+                String logoPath = "C:\\Users\\leone\\OneDrive\\Desktop\\Sistema-Gestion-Comercial\\frontend\\public\\Copia de Copia de Leonel.png";
+                java.io.File logoFile = new java.io.File(logoPath);
+                if (logoFile.exists()) {
+                    logo = java.nio.file.Files.readAllBytes(logoFile.toPath());
+                }
+            } catch (Exception ignored) {}
+
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            notaService.generarPdfNota(id, baos, logo);
+
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "nota-" + id + ".pdf");
+            return org.springframework.http.ResponseEntity.ok().headers(headers).body(baos.toByteArray());
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
+    }
+
     public static class CrearNotaRequest {
         private String tipo;
         private BigDecimal monto;

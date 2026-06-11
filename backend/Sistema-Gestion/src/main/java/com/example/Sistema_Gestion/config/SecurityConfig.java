@@ -69,8 +69,13 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Orígenes permitidos: siempre localhost en desarrollo, más cualquier IP extra (Tailscale)
-        List<String> allowedOrigins = new ArrayList<>(Arrays.asList("http://localhost:3000"));
+        // Orígenes permitidos: localhost en desarrollo, dominio de producción y cualquier IP extra
+        List<String> allowedOrigins = new ArrayList<>(Arrays.asList(
+            "http://localhost:3000",
+            "http://localhost:8080",
+            "https://gomezgestion.ar",
+            "https://www.gomezgestion.ar"
+        ));
         if (extraAllowedOrigin != null && !extraAllowedOrigin.isBlank()) {
             allowedOrigins.add(extraAllowedOrigin);
         }
