@@ -384,8 +384,23 @@ export default function RemitoFormModal({ remito = null, onClose, onSaved }) {
                                             {showResults[idx] && (searchTerms[idx] || "").length > 0 && (
                                                 <ul className="autocomplete-dropdown">
                                                     {getFilteredProducts(searchTerms[idx]).map(p => (
-                                                        <li key={p.id} onClick={() => updateItem(idx, 'producto', p)}>
-                                                            <div className="prod-name">{p.nombre}</div>
+                                                        <li 
+                                                            key={p.id} 
+                                                            onClick={() => {
+                                                                if (p.activo !== false) {
+                                                                    updateItem(idx, 'producto', p);
+                                                                }
+                                                            }}
+                                                            style={{ 
+                                                                opacity: p.activo === false ? 0.5 : 1, 
+                                                                cursor: p.activo === false ? 'not-allowed' : 'pointer',
+                                                                background: p.activo === false ? '#f3f4f6' : ''
+                                                            }}
+                                                            title={p.activo === false ? "Producto inactivo" : ""}
+                                                        >
+                                                            <div className="prod-name">
+                                                                {p.nombre} {p.activo === false && <span style={{color: '#ef4444', fontSize: '0.8rem'}}>(Inactivo)</span>}
+                                                            </div>
                                                             <div className="prod-sku">SKU: {p.sku || 'S/S'} | Stock: {p.stock}</div>
                                                         </li>
                                                     ))}

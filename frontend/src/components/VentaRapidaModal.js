@@ -316,9 +316,21 @@ export default function VentaRapidaModal({ onClose, onSaved }) {
                                                         {getFilteredProducts(searchTerms[index]).map(p => (
                                                             <li
                                                                 key={p.id}
-                                                                onClick={() => updateItem(index, 'producto', p)}
+                                                                onClick={() => {
+                                                                    if (p.activo !== false) {
+                                                                        updateItem(index, 'producto', p);
+                                                                    }
+                                                                }}
+                                                                style={{ 
+                                                                    opacity: p.activo === false ? 0.5 : 1, 
+                                                                    cursor: p.activo === false ? 'not-allowed' : 'pointer',
+                                                                    background: p.activo === false ? '#f3f4f6' : ''
+                                                                }}
+                                                                title={p.activo === false ? "Producto inactivo" : ""}
                                                             >
-                                                                <div className="prod-name">{p.nombre}</div>
+                                                                <div className="prod-name">
+                                                                    {p.nombre} {p.activo === false && <span style={{color: '#ef4444', fontSize: '0.8rem'}}>(Inactivo)</span>}
+                                                                </div>
                                                                 <div className="prod-sku">
                                                                     SKU: {p.sku || 'S/S'} | 
                                                                     <span style={{ color: p.stock > 0 ? '#10b981' : '#ef4444', fontWeight: '600' }}> Stock: {p.stock}</span>

@@ -425,11 +425,24 @@ export default function CompraFormModal({ proveedor, onClose, onSaved, compraEdi
                                                 {getFilteredProducts(searchTerms[idx]).map(p => (
                                                     <div
                                                         key={p.id}
-                                                        style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #f8f8f8" }}
-                                                        onMouseDown={() => updateItem(idx, 'producto', p.id)} // onMouseDown para que ocurra antes del blur
-                                                        className="search-item-hover"
+                                                        style={{ 
+                                                            padding: "10px", 
+                                                            cursor: p.activo === false ? 'not-allowed' : 'pointer', 
+                                                            borderBottom: "1px solid #f8f8f8",
+                                                            opacity: p.activo === false ? 0.5 : 1,
+                                                            background: p.activo === false ? '#f3f4f6' : ''
+                                                        }}
+                                                        onMouseDown={() => {
+                                                            if (p.activo !== false) {
+                                                                updateItem(idx, 'producto', p.id);
+                                                            }
+                                                        }} // onMouseDown para que ocurra antes del blur
+                                                        className={p.activo !== false ? "search-item-hover" : ""}
+                                                        title={p.activo === false ? "Producto inactivo" : ""}
                                                     >
-                                                        <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>{p.nombre}</div>
+                                                        <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>
+                                                            {p.nombre} {p.activo === false && <span style={{color: '#ef4444', fontSize: '0.8rem'}}>(Inactivo)</span>}
+                                                        </div>
                                                         <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>SKU: {p.sku || 'S/S'} | Stock: {p.stock}</div>
                                                     </div>
                                                 ))}
