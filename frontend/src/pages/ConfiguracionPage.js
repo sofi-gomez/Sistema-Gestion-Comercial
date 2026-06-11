@@ -243,7 +243,7 @@ export default function ConfiguracionPage() {
                                         type="text"
                                         value={config.nombreEmpresa || ""}
                                         onChange={e => setConfig({ ...config, nombreEmpresa: e.target.value })}
-                                        placeholder="Ej: Agro-Ferretería Gomez"
+                                        placeholder="Ej: Gea Agrícola"
                                     />
                                 </div>
                                 <div className="input-field flex-1">
@@ -313,7 +313,10 @@ export default function ConfiguracionPage() {
             </main>
 
             <footer className="home-footer">
-                <p>© 2024 Sistema de Gestión Comercial • Módulo de Herramientas Avanzadas</p>
+                <div className="footer-content">
+                    <p>© {new Date().getFullYear()} Gea Agrícola </p>
+                    <p className="footer-tagline">NUESTRAS PLANTAS NUNCA DUERMEN</p>
+                </div>
             </footer>
 
             <style>{`

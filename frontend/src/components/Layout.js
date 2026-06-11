@@ -24,8 +24,8 @@ const Layout = ({ children }) => {
                         <img src="/iSOTIPO.png" alt="Isotipo" className="brand-logo" />
                     </div>
                     <div className="brand-text">
-                        <h1>LEONEL GOMEZ</h1>
-                        <p className="subtitle">Agro-Ferretería</p>
+                        <h1>GEA AGRÍCOLA</h1>
+                        <p className="subtitle">NUESTRAS PLANTAS NUNCA DUERMEN</p>
                     </div>
                 </div>
 

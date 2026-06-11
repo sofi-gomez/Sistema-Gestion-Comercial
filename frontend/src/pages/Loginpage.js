@@ -55,8 +55,8 @@ export default function LoginPage() {
                     <div className="login-logo-container">
                         <img src="/iSOTIPO.png" alt="Isotipo" className="login-logo" />
                     </div>
-                    <h1>LEONEL GOMEZ</h1>
-                    <p>Agro-Ferretería</p>
+                    <h1>GEA AGRÍCOLA</h1>
+                    <p>NUESTRAS PLANTAS NUNCA DUERMEN</p>
                     <p style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}>Inicie sesión para continuar</p>
                 </div>
 
@@ -116,7 +116,7 @@ export default function LoginPage() {
                 </form>
 
                 <div className="login-footer">
-                    <p>© {new Date().getFullYear()} Leonel Gomez — Agro-Ferretería</p>
+                    <p>© {new Date().getFullYear()} Gea Agrícola</p>
                     <p className="footer-tagline">NUESTRAS PLANTAS NUNCA DUERMEN</p>
                 </div>
             </div>
