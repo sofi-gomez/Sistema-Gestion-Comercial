@@ -19,6 +19,7 @@ export default function CajaDiariaSection() {
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
+    const [resumen, setResumen] = useState({ totalIngresos: 0, totalEgresos: 0, saldoActual: 0 });
     const navigate = useNavigate();
 
     const cleanDescription = (desc, entidad) => {
@@ -34,6 +35,20 @@ export default function CajaDiariaSection() {
         }
         return cleaned.trim() || desc;
     };
+
+    const fetchResumen = useCallback(async () => {
+        try {
+            const res = await apiFetch(`${API_BASE}/resumen`);
+            const data = await res.json();
+            setResumen({
+                totalIngresos: data.totalIngresos || 0,
+                totalEgresos: data.totalEgresos || 0,
+                saldoActual: data.saldoActual || 0
+            });
+        } catch (err) {
+            console.error("Error al obtener resumen:", err);
+        }
+    }, []);
 
     const fetchAll = useCallback(async (resetPage = true) => {
         if (resetPage) {
@@ -64,15 +79,15 @@ export default function CajaDiariaSection() {
         }
     }, [page, sortOrder]);
 
-    useEffect(() => { fetchAll(true); }, [sortOrder]);
+    useEffect(() => { fetchAll(true); fetchResumen(); }, [sortOrder]);
 
-    const handleSaved = () => { setModalOpen(false); setMovimientoEditar(null); fetchAll(); };
+    const handleSaved = () => { setModalOpen(false); setMovimientoEditar(null); fetchAll(); fetchResumen(); };
 
     const handleAnular = async (id) => {
         if (!window.confirm("¿Estás seguro de que deseas anular este movimiento? No impactará más en los saldos.")) return;
         try {
             const res = await apiFetch(`${API_BASE}/${id}`, { method: "DELETE" });
-            if (res.ok) fetchAll();
+            if (res.ok) { fetchAll(); fetchResumen(); }
             else alert("Error al anular movimiento.");
         } catch (err) {
             console.error(err);
@@ -148,9 +163,9 @@ export default function CajaDiariaSection() {
         return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
     });
 
-    const ingresosT = movimientos.filter(m => !m.anulado && m.tipo?.toUpperCase() === 'INGRESO').reduce((acc, m) => acc + Number(m.importe || 0), 0);
-    const egresosT = movimientos.filter(m => !m.anulado && m.tipo?.toUpperCase() === 'EGRESO').reduce((acc, m) => acc + Number(m.importe || 0), 0);
-    const saldo = ingresosT - egresosT;
+    const ingresosT = resumen.totalIngresos;
+    const egresosT = resumen.totalEgresos;
+    const saldo = resumen.saldoActual;
 
     return (
         <div className="caja-diaria-section">
