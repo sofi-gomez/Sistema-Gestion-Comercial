@@ -281,17 +281,17 @@ public class TesoreriaService {
         LocalDate hoy = LocalDate.now();
 
         BigDecimal ingresos = todos.stream()
-                .filter(m -> m.getAnulado() != null && !m.getAnulado() && "INGRESO".equalsIgnoreCase(m.getTipo()))
+                .filter(m -> (m.getAnulado() == null || !m.getAnulado()) && "INGRESO".equalsIgnoreCase(m.getTipo()))
                 .map(m -> m.getImporte() != null ? m.getImporte() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal egresos = todos.stream()
-                .filter(m -> m.getAnulado() != null && !m.getAnulado() && "EGRESO".equalsIgnoreCase(m.getTipo()))
+                .filter(m -> (m.getAnulado() == null || !m.getAnulado()) && "EGRESO".equalsIgnoreCase(m.getTipo()))
                 .map(m -> m.getImporte() != null ? m.getImporte() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         List<MovimientoTesoreria> cheques = todos.stream()
-                .filter(m -> m.getAnulado() != null && !m.getAnulado())
+                .filter(m -> m.getAnulado() == null || !m.getAnulado())
                 .filter(m -> !m.getCobrado())
                 .filter(m -> "CHEQUE".equalsIgnoreCase(m.getMedioPago())
                         || "CHEQUE_ELECTRONICO".equalsIgnoreCase(m.getMedioPago()))

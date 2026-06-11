@@ -274,7 +274,7 @@ public class RemitoService {
             if (logoBytes != null) {
                 try {
                     PDImageXObject pdImage = PDImageXObject.createFromByteArray(doc, logoBytes, "logo");
-                    cs.drawImage(pdImage, x, currentY - 60, 60, 60);
+                    cs.drawImage(pdImage, x, currentY - 120, 140, 140);
                 } catch (Exception ex) {
                     // Ignorar error de logo
                 }
@@ -305,7 +305,7 @@ public class RemitoService {
             cs.endText();
 
             // --- LÍNEA DE SEPARACIÓN SUPERIOR ---
-            currentY -= 75;
+            currentY -= 150;
             cs.setLineWidth(1.2f);
             cs.moveTo(x, currentY);
             cs.lineTo(w - margin, currentY);

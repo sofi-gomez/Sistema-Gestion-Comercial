@@ -42,8 +42,7 @@ public class ProveedorController {
     @PutMapping("/{id}")
     public Proveedor actualizar(@PathVariable("id") Long id, @Valid @RequestBody Proveedor proveedor) {
         log.info("Actualizando proveedor ID: {}", id);
-        proveedor.setId(id);
-        return proveedorService.guardar(proveedor);
+        return proveedorService.actualizar(id, proveedor);
     }
 
     @DeleteMapping("/{id}")
@@ -88,7 +87,7 @@ public class ProveedorController {
 
         byte[] logoBytes = null;
         try {
-            String logoPath = "C:\\Users\\leone\\OneDrive\\Desktop\\Sistema-Gestion-Comercial\\frontend\\src\\logo.png";
+            String logoPath = "C:\\Users\\leone\\OneDrive\\Desktop\\Sistema-Gestion-Comercial\\frontend\\public\\Copia de Copia de Leonel.png";
             java.io.File logoFile = new java.io.File(logoPath);
             if (logoFile.exists()) {
                 logoBytes = java.nio.file.Files.readAllBytes(logoFile.toPath());

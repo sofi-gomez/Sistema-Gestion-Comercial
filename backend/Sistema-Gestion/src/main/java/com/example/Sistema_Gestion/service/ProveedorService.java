@@ -362,7 +362,7 @@ public class ProveedorService {
             if (logoBytes != null) {
                 try {
                     PDImageXObject pdImage = PDImageXObject.createFromByteArray(doc, logoBytes, "logo");
-                    cs.drawImage(pdImage, margin, y - 45, 45, 45);
+                    cs.drawImage(pdImage, margin, y - 120, 140, 140);
                 } catch (Exception e) {
                 }
             }
@@ -386,7 +386,7 @@ public class ProveedorService {
             cs.showText(periodoText);
             cs.endText();
 
-            y -= 75;
+            y -= 150;
 
             // --- BLOQUE DE PROVEEDOR ---
             cs.setNonStrokingColor(new java.awt.Color(245, 245, 245));

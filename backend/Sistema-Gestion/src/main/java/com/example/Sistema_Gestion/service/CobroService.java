@@ -443,7 +443,7 @@ public class CobroService {
                 try {
                     org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject logo = org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject
                             .createFromByteArray(doc, logoBytes, "logo");
-                    cs.drawImage(logo, margin, y - 60, 60, 60);
+                    cs.drawImage(logo, margin, y - 120, 140, 140);
                 } catch (Exception ignored) {
                 }
             }
@@ -471,7 +471,7 @@ public class CobroService {
             cs.endText();
 
             // Línea separadora
-            y -= 75;
+            y -= 150;
             cs.setLineWidth(1f);
             cs.moveTo(margin, y);
             cs.lineTo(w - margin, y);
@@ -691,13 +691,31 @@ public class CobroService {
                 cs.showText("Observaciones: ");
                 cs.endText();
                 y -= 13;
-                cs.beginText();
+                // Partir el texto en líneas para que no se salga del margen
+                String obsText = safe(cobro.getObservaciones());
+                int maxCharsPerLine = 95; // aprox para fuente 9 con el ancho A4
+                String[] words = obsText.split(" ");
+                StringBuilder currentLine = new StringBuilder();
+                java.util.List<String> obsLines = new java.util.ArrayList<>();
+                for (String word : words) {
+                    if (currentLine.length() + word.length() + 1 > maxCharsPerLine) {
+                        obsLines.add(currentLine.toString().trim());
+                        currentLine = new StringBuilder();
+                    }
+                    currentLine.append(word).append(" ");
+                }
+                if (currentLine.length() > 0) obsLines.add(currentLine.toString().trim());
                 cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 9);
-                cs.newLineAtOffset(margin + 5, y);
-                cs.showText(safe(cobro.getObservaciones()));
-                cs.endText();
-                y -= 16;
+                for (String line : obsLines) {
+                    cs.beginText();
+                    cs.newLineAtOffset(margin + 5, y);
+                    cs.showText(line);
+                    cs.endText();
+                    y -= 12;
+                }
+                y -= 4;
             }
+
 
             // ----- FIRMA -----
             y -= 40;

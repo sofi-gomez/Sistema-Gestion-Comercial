@@ -91,7 +91,11 @@ public class RemitoController {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             byte[] logo = null;
             try {
-                logo = getClass().getResourceAsStream("/static/iSOTIPO.png").readAllBytes();
+                String logoPath = "C:\\Users\\leone\\OneDrive\\Desktop\\Sistema-Gestion-Comercial\\frontend\\public\\Copia de Copia de Leonel.png";
+                java.io.File logoFile = new java.io.File(logoPath);
+                if (logoFile.exists()) {
+                    logo = java.nio.file.Files.readAllBytes(logoFile.toPath());
+                }
             } catch (Exception ex) {
                 log.warn("No se pudo cargar el logo para el PDF del remito {}", id);
             }

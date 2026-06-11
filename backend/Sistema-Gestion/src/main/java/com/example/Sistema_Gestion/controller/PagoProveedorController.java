@@ -86,7 +86,11 @@ public class PagoProveedorController {
         try {
             byte[] logo = null;
             try {
-                logo = getClass().getResourceAsStream("/static/iSOTIPO.png").readAllBytes();
+                String logoPath = "C:\\Users\\leone\\OneDrive\\Desktop\\Sistema-Gestion-Comercial\\frontend\\public\\Copia de Copia de Leonel.png";
+                java.io.File logoFile = new java.io.File(logoPath);
+                if (logoFile.exists()) {
+                    logo = java.nio.file.Files.readAllBytes(logoFile.toPath());
+                }
             } catch (Exception ignored) {}
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             pagoProveedorService.generarPdfOrdenPago(id, baos, logo);

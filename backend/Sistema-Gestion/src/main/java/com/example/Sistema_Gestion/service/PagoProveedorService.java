@@ -277,7 +277,7 @@ public class PagoProveedorService {
                 try {
                     org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject logo =
                             org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject.createFromByteArray(doc, logoBytes, "logo");
-                    cs.drawImage(logo, margin, y - 60, 60, 60);
+                    cs.drawImage(logo, margin, y - 120, 140, 140);
                 } catch (Exception ignored) {}
             }
 
@@ -304,7 +304,7 @@ public class PagoProveedorService {
             cs.endText();
 
             // Línea separadora
-            y -= 75;
+            y -= 150;
             cs.setLineWidth(1f);
             cs.moveTo(margin, y); cs.lineTo(w - margin, y); cs.stroke();
 
