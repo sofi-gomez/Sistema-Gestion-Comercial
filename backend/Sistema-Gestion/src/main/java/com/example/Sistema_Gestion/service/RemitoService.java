@@ -21,6 +21,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import com.example.Sistema_Gestion.model.Configuracion;
 
@@ -199,7 +200,12 @@ public class RemitoService {
             }
         }
 
-        remitoRepository.delete(remito);
+        try {
+            remitoRepository.delete(remito);
+            remitoRepository.flush(); // Asegurarnos de que Hibernate ejecute el delete ahora para capturar la excepción si ocurre
+        } catch (DataIntegrityViolationException e) {
+            throw new RuntimeException("No se puede eliminar el remito porque ya tiene cobros asociados. Por favor, anule o elimine los cobros primero.");
+        }
     }
 
     @Transactional
