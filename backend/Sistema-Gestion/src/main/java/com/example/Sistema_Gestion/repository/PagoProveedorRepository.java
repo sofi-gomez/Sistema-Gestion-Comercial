@@ -14,7 +14,7 @@ public interface PagoProveedorRepository extends JpaRepository<PagoProveedor, Lo
 
     List<PagoProveedor> findByProveedorIdOrderByFechaDesc(Long proveedorId);
 
-    @Query("SELECT COALESCE(SUM(p.importe), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND p.moneda = 'ARS'")
+    @Query("SELECT COALESCE(SUM(p.importe), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND (p.moneda = 'ARS' OR p.moneda IS NULL)")
     BigDecimal totalPagadoARSPorProveedor(@Param("proveedorId") Long proveedorId);
 
     @Query("SELECT COALESCE(SUM(p.importeDolares), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND p.moneda = 'USD'")
@@ -23,7 +23,7 @@ public interface PagoProveedorRepository extends JpaRepository<PagoProveedor, Lo
     List<PagoProveedor> findByProveedorIdAndFechaBetweenOrderByFechaAsc(Long proveedorId, LocalDate desde,
             LocalDate hasta);
 
-    @Query("SELECT COALESCE(SUM(p.importe), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND p.fecha < :fecha AND p.moneda = 'ARS'")
+    @Query("SELECT COALESCE(SUM(p.importe), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND p.fecha < :fecha AND (p.moneda = 'ARS' OR p.moneda IS NULL)")
     BigDecimal totalPagadoARSAntesDe(@Param("proveedorId") Long proveedorId, @Param("fecha") LocalDate fecha);
 
     @Query("SELECT COALESCE(SUM(p.importeDolares), 0) FROM PagoProveedor p WHERE p.proveedor.id = :proveedorId AND p.anulado = false AND p.fecha < :fecha AND p.moneda = 'USD'")
