@@ -61,6 +61,12 @@ public class NotaController {
         }
     }
 
+    @DeleteMapping("/{id}/anular")
+    public org.springframework.http.ResponseEntity<Void> anularNota(@PathVariable Long id) {
+        notaService.anularNota(id);
+        return org.springframework.http.ResponseEntity.noContent().build();
+    }
+
     public static class CrearNotaRequest {
         private String tipo;
         private BigDecimal monto;

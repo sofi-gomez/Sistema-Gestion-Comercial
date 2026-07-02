@@ -291,6 +291,32 @@ export default function ClienteCtaCteSection({ clienteId }) {
                                                 >
                                                     <FiDownload />
                                                 </button>
+                                                <button
+                                                    className="btn-modern danger"
+                                                    style={{ 
+                                                        padding: "6px 10px", 
+                                                        color: "#ef4444", 
+                                                        background: "#fef2f2",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "6px",
+                                                        fontSize: "0.8rem",
+                                                        fontWeight: "600",
+                                                        border: "1px solid #fee2e2"
+                                                    }}
+                                                    title="Anular Nota"
+                                                    onClick={async () => {
+                                                        if (window.confirm("¿Estás seguro de que deseas anular esta nota? Se revertirá su efecto en el saldo del cliente.")) {
+                                                            try {
+                                                                const res = await apiFetch(`/api/notas/${m.idReferencia}/anular`, { method: "DELETE" });
+                                                                if (res.ok) fetchCtaCte();
+                                                                else alert("No se pudo anular la nota.");
+                                                            } catch (e) { console.error(e); }
+                                                        }
+                                                    }}
+                                                >
+                                                    <FiTrash2 /> Anular
+                                                </button>
                                             </div>
                                         )}
                                     </td>

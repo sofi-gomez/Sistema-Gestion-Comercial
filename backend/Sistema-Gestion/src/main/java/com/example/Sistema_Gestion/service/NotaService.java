@@ -65,6 +65,14 @@ public class NotaService {
         }
     }
 
+    @Transactional
+    public void anularNota(Long id) {
+        Nota nota = notaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Nota no encontrada"));
+        nota.setEstado(Nota.EstadoNota.ANULADA);
+        notaRepository.save(nota);
+    }
+
     public void generarPdfNota(Long notaId, java.io.OutputStream os, byte[] logoBytes) throws Exception {
         Nota nota = notaRepository.findById(notaId)
                 .orElseThrow(() -> new RuntimeException("Nota no encontrada: " + notaId));
