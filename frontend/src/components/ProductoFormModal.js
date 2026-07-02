@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { NumericFormat } from 'react-number-format';
 import "../index.css";
 
 export default function ProductoFormModal({ producto, onClose, onSave, cotizacion, productosExistentes = [] }) {
@@ -250,13 +251,14 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                                 <div className="form-grid-inner">
                                     <div className="form-group">
                                         <label className="form-label">Costo Neto (ARS)</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            name="precioCosto"
+                                        <NumericFormat
                                             value={form.precioCosto}
-                                            onChange={handleChange}
-                                            onWheel={(e) => e.target.blur()}
+                                            onValueChange={(values) => setForm(prev => ({ ...prev, precioCosto: values.floatValue || "" }))}
+                                            thousandSeparator="."
+                                            decimalSeparator=","
+                                            prefix="$ "
+                                            allowNegative={false}
+                                            decimalScale={2}
                                             onFocus={(e) => e.target.select()}
                                             className="modern-input"
                                             placeholder="Sin IVA"
@@ -304,13 +306,14 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
 
                                     <div className="form-group full-width">
                                         <label className="form-label" style={{ color: "#16a34a", fontWeight: "700" }}>Precio de Venta Sugerido ($ARS)</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            name="precioVenta"
+                                        <NumericFormat
                                             value={form.precioVenta}
-                                            onChange={handleChange}
-                                            onWheel={(e) => e.target.blur()}
+                                            onValueChange={(values) => setForm(prev => ({ ...prev, precioVenta: values.floatValue || "" }))}
+                                            thousandSeparator="."
+                                            decimalSeparator=","
+                                            prefix="$ "
+                                            allowNegative={false}
+                                            decimalScale={2}
                                             onFocus={(e) => e.target.select()}
                                             className="modern-input"
                                             style={{ borderColor: "#16a34a", background: "#f0fdf4", fontWeight: "700" }}
@@ -325,16 +328,17 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
                                 <div className="form-grid-inner">
                                     <div className="form-group">
                                         <label className="form-label">Costo USD Neto</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            name="precioCostoUSD"
+                                        <NumericFormat
                                             value={form.precioCostoUSD}
-                                            onChange={handleChange}
-                                            onWheel={(e) => e.target.blur()}
+                                            onValueChange={(values) => setForm(prev => ({ ...prev, precioCostoUSD: values.floatValue || "" }))}
+                                            thousandSeparator="."
+                                            decimalSeparator=","
+                                            prefix="U$D "
+                                            allowNegative={false}
+                                            decimalScale={2}
                                             onFocus={(e) => e.target.select()}
                                             className="modern-input"
-                                            placeholder="0.00"
+                                            placeholder="0,00"
                                         />
                                     </div>
 
@@ -351,13 +355,14 @@ export default function ProductoFormModal({ producto, onClose, onSave, cotizacio
 
                                     <div className="form-group full-width">
                                         <label className="form-label">Precio de Venta USD</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            name="precioVentaUSD"
+                                        <NumericFormat
                                             value={form.precioVentaUSD}
-                                            onChange={handleChange}
-                                            onWheel={(e) => e.target.blur()}
+                                            onValueChange={(values) => setForm(prev => ({ ...prev, precioVentaUSD: values.floatValue || "" }))}
+                                            thousandSeparator="."
+                                            decimalSeparator=","
+                                            prefix="U$D "
+                                            allowNegative={false}
+                                            decimalScale={2}
                                             onFocus={(e) => e.target.select()}
                                             className="modern-input"
                                             style={{ borderColor: "#d97706", fontWeight: "600" }}

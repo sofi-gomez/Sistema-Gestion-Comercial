@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { apiFetch } from "../utils/api";
-import { FiX, FiPlus, FiTrash2, FiSearch, FiCheck, FiZap } from "react-icons/fi";
+import { FiX, FiPlus, FiTrash2, FiCheck, FiZap } from "react-icons/fi";
+import { NumericFormat } from 'react-number-format';
 import "../index.css";
 
 export default function VentaRapidaModal({ onClose, onSaved }) {
@@ -197,7 +198,22 @@ export default function VentaRapidaModal({ onClose, onSaved }) {
             // Confirmación
             const imprimir = window.confirm(`¡Venta rápida registrada con éxito por $${totalCalculado.toLocaleString()}!\n\n¿Desea imprimir el comprobante?`);
             if (imprimir) {
-                window.open(`/api/remitos/${remitoCreado.id}/pdf`, "_blank");
+                try {
+                    const resPdf = await apiFetch(`/api/remitos/${remitoCreado.id}/pdf`);
+                    if (resPdf.ok) {
+                        const blob = await resPdf.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `remito_${remitoCreado.numero || remitoCreado.id}.pdf`;
+                        a.click();
+                    } else {
+                        alert("No se pudo descargar el PDF");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("Error al descargar PDF");
+                }
             }
             
             onSaved();
@@ -356,14 +372,15 @@ export default function VentaRapidaModal({ onClose, onSaved }) {
                                                 />
                                             </td>
                                             <td style={{ position: 'relative' }}>
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
+                                                <NumericFormat
                                                     className="modern-input"
                                                     value={item.precioVenta}
-                                                    onChange={(e) => updateItem(index, 'precioVenta', parseFloat(e.target.value) || 0)}
-                                                    onWheel={(e) => e.target.blur()}
+                                                    onValueChange={(values) => updateItem(index, 'precioVenta', values.floatValue || 0)}
+                                                    thousandSeparator="."
+                                                    decimalSeparator=","
+                                                    prefix="$ "
+                                                    allowNegative={false}
+                                                    decimalScale={2}
                                                     onFocus={(e) => e.target.select()}
                                                     style={item.producto && item.precioVenta < item.producto.precioCosto ? { borderColor: '#ef4444', color: '#ef4444', fontWeight: '600' } : {}}
                                                 />

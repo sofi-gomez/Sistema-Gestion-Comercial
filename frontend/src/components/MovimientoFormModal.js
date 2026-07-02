@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { NumericFormat } from 'react-number-format';
 import CamposCheque from "./CamposCheque";
 import { apiFetch } from "../utils/api";
 import "../index.css";
@@ -145,14 +146,16 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
                             {/* Importe */}
                             <div className="form-group">
                                 <label className="form-label">Importe *</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={importe}
-                                    onChange={(e) => setImporte(e.target.value)}
-                                    onWheel={(e) => e.target.blur()}
+                                <NumericFormat
                                     className="modern-input"
-                                    placeholder="0.00"
+                                    value={importe}
+                                    onValueChange={(values) => setImporte(values.floatValue || "")}
+                                    thousandSeparator="."
+                                    decimalSeparator=","
+                                    prefix="$ "
+                                    allowNegative={false}
+                                    decimalScale={2}
+                                    placeholder="$ 0,00"
                                     required
                                 />
                             </div>

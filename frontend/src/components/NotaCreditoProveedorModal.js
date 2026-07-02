@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { FiX, FiCheck, FiFileText } from "react-icons/fi";
+import { NumericFormat } from 'react-number-format';
 import { apiFetch } from "../utils/api";
 
 const API_NOTAS_PROVEEDOR = "/api/notas-proveedor";
@@ -105,13 +106,15 @@ export default function NotaCreditoProveedorModal({ proveedor, onClose, onSaved 
                                 <label className="form-label">Monto</label>
                                 <div style={{ position: "relative" }}>
                                     <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--muted)", fontWeight: "600" }}>$</span>
-                                    <input
-                                        type="number"
-                                        step="0.01"
+                                    <NumericFormat
                                         className="modern-input"
                                         style={{ paddingLeft: "25px", fontSize: "1.1rem", fontWeight: "600" }}
                                         value={monto}
-                                        onChange={(e) => setMonto(e.target.value)}
+                                        onValueChange={(values) => setMonto(values.floatValue || "")}
+                                        thousandSeparator="."
+                                        decimalSeparator=","
+                                        allowNegative={false}
+                                        decimalScale={2}
                                         required
                                     />
                                 </div>

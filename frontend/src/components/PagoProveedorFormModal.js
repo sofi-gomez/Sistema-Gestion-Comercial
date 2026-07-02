@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { FiDollarSign, FiCreditCard, FiHash, FiUser, FiX, FiDownload } from "react-icons/fi";
+import { NumericFormat } from 'react-number-format';
 import CamposCheque from "./CamposCheque";
 import { apiFetch } from "../utils/api";
 
@@ -202,15 +203,17 @@ export default function PagoProveedorFormModal({ onClose, onSaved, proveedorIdPr
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                                  <div className="form-group">
                                     <label className="form-label"><FiDollarSign /> Monto a Pagar {monedaPago === "USD" ? "(USD)" : "(ARS)"} *</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
+                                    <NumericFormat
                                         className="modern-input"
                                         value={monto}
-                                        onChange={e => setMonto(e.target.value)}
-                                        onWheel={(e) => e.target.blur()}
+                                        onValueChange={(values) => setMonto(values.floatValue || "")}
+                                        thousandSeparator="."
+                                        decimalSeparator=","
+                                        prefix={monedaPago === "USD" ? "U$D " : "$ "}
+                                        allowNegative={false}
+                                        decimalScale={2}
                                         onFocus={(e) => e.target.select()}
-                                        placeholder={monedaPago === "USD" ? "0.00 dólares" : "0.00 pesos"}
+                                        placeholder={monedaPago === "USD" ? "0,00 dólares" : "0,00 pesos"}
                                         required
                                         disabled={!!pagoEditar}
                                     />
@@ -273,17 +276,18 @@ export default function PagoProveedorFormModal({ onClose, onSaved, proveedorIdPr
                                 {necesitaTC && (
                                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                         <label className="form-label" style={{color: "#334155"}}>Tipo de Cambio (referencia) *</label>
-                                        <input
-                                            type="number"
+                                        <NumericFormat
                                             className="modern-input"
                                             value={tipoCambio}
-                                            onChange={e => setTipoCambio(e.target.value)}
-                                            onWheel={(e) => e.target.blur()}
+                                            onValueChange={(values) => setTipoCambio(values.floatValue || "")}
+                                            thousandSeparator="."
+                                            decimalSeparator=","
+                                            prefix="$ "
+                                            allowNegative={false}
+                                            decimalScale={2}
                                             onFocus={(e) => e.target.select()}
-                                            step="0.01"
-                                            min="1"
                                             required
-                                            placeholder="Ej: 1395"
+                                            placeholder="Ej: 1395,00"
                                         />
                                     </div>
                                 )}

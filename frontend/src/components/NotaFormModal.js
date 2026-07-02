@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { FiX, FiSave, FiAlertCircle } from "react-icons/fi";
+import { NumericFormat } from 'react-number-format';
 import { apiFetch } from "../utils/api";
 
 export default function NotaFormModal({ clienteId, onClose, onSaved }) {
@@ -146,31 +147,35 @@ export default function NotaFormModal({ clienteId, onClose, onSaved }) {
                                 </div>
                                 <div className="form-group" style={{ marginBottom: "1.5rem" }}>
                                     <label className="form-label">Gastos Bancarios (opcional)</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.01" 
+                                    <NumericFormat
                                         className="modern-input"
                                         value={gastosBancarios}
-                                        onChange={(e) => setGastosBancarios(e.target.value)}
-                                        onWheel={(e) => e.target.blur()}
+                                        onValueChange={(values) => setGastosBancarios(values.floatValue || "")}
+                                        thousandSeparator="."
+                                        decimalSeparator=","
+                                        prefix="$ "
+                                        allowNegative={false}
+                                        decimalScale={2}
                                         onFocus={(e) => e.target.select()}
-                                        placeholder="0.00"
+                                        placeholder="$ 0,00"
                                     />
                                 </div>
                             </>
                         ) : (
                             <div className="form-group" style={{ marginBottom: "1.5rem" }}>
                                 <label className="form-label">Monto</label>
-                                <input 
-                                    type="number" 
-                                    step="0.01" 
+                                <NumericFormat
                                     className="modern-input" 
                                     value={monto} 
-                                    onChange={(e) => setMonto(e.target.value)} 
-                                    onWheel={(e) => e.target.blur()}
+                                    onValueChange={(values) => setMonto(values.floatValue || "")} 
+                                    thousandSeparator="."
+                                    decimalSeparator=","
+                                    prefix="$ "
+                                    allowNegative={false}
+                                    decimalScale={2}
                                     onFocus={(e) => e.target.select()}
                                     required 
-                                    placeholder="0.00"
+                                    placeholder="$ 0,00"
                                 />
                             </div>
                         )}

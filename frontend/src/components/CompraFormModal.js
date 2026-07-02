@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { FiPlus, FiTrash2, FiSave, FiX } from "react-icons/fi";
+import { NumericFormat } from 'react-number-format';
 import ProductoFormModal from "./ProductoFormModal";
 import { apiFetch } from "../utils/api";
 import "../index.css";
@@ -333,14 +334,15 @@ export default function CompraFormModal({ proveedor, onClose, onSaved, compraEdi
                             {form.moneda === "USD" && (
                                 <div className="form-group">
                                     <label className="form-label" style={{color: "#334155"}}>Tipo de Cambio (T/C)</label>
-                                    <input
-                                        type="number"
+                                    <NumericFormat
                                         className="modern-input"
                                         value={form.tipoCambio}
-                                        onChange={e => setForm({ ...form, tipoCambio: e.target.value })}
-                                        onWheel={(e) => e.target.blur()}
-                                        step="0.01"
-                                        min="1"
+                                        onValueChange={(values) => setForm({ ...form, tipoCambio: values.floatValue || "" })}
+                                        thousandSeparator="."
+                                        decimalSeparator=","
+                                        prefix="$ "
+                                        allowNegative={false}
+                                        decimalScale={2}
                                         required
                                     />
                                 </div>
@@ -459,14 +461,16 @@ export default function CompraFormModal({ proveedor, onClose, onSaved, compraEdi
                                         min="1"
                                         required
                                     />
-                                    <input
-                                        type="number"
+                                    <NumericFormat
                                         className="modern-input"
                                         value={it.precioUnitario}
-                                        onChange={e => updateItem(idx, 'precioUnitario', e.target.value)}
-                                        onWheel={(e) => e.target.blur()}
-                                        placeholder="Costo Unit."
-                                        step="0.01"
+                                        onValueChange={(values) => updateItem(idx, 'precioUnitario', values.floatValue || "")}
+                                        thousandSeparator="."
+                                        decimalSeparator=","
+                                        prefix="$ "
+                                        allowNegative={false}
+                                        decimalScale={2}
+                                        placeholder="$ 0,00"
                                         required={form.estado === 'CONFIRMADA'}
                                     />
                                     <input
@@ -499,17 +503,18 @@ export default function CompraFormModal({ proveedor, onClose, onSaved, compraEdi
                                 <option value="PORCENTAJE">Porcentaje %</option>
                                 <option value="MONTO">Monto fijo $</option>
                             </select>
-                            <input
-                                type="number"
-                                className="modern-input"
-                                value={form.descuentoValor}
-                                onChange={e => setForm({ ...form, descuentoValor: e.target.value === '' ? '' : e.target.value })}
-                                onWheel={(e) => e.target.blur()}
-                                style={{ width: "100px", padding: "6px 10px" }}
-                                placeholder="0"
-                                min="0"
-                                step="0.01"
-                            />
+                            <NumericFormat
+                                        className="modern-input"
+                                        value={form.descuentoValor}
+                                        onValueChange={(values) => setForm({ ...form, descuentoValor: values.floatValue || "" })}
+                                        thousandSeparator="."
+                                        decimalSeparator=","
+                                        prefix={form.descuentoTipo === "MONTO" ? "$ " : ""}
+                                        allowNegative={false}
+                                        decimalScale={2}
+                                        style={{ width: "100px", padding: "6px 10px" }}
+                                        placeholder="0"
+                                    />
                             <span style={{ fontSize: "0.8rem", color: "#92400e" }}>{form.descuentoTipo === "PORCENTAJE" ? "%" : "$"}</span>
                         </div>
 

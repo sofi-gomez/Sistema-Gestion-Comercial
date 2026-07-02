@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { FiDollarSign, FiCreditCard, FiHash, FiUser, FiPlus, FiTrash2 } from "react-icons/fi";
+import { NumericFormat } from 'react-number-format';
 import CamposCheque from "./CamposCheque";
 import { apiFetch } from "../utils/api";
 
@@ -290,13 +291,16 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                                                     </td>
                                                     <td style={{ textAlign: "right" }}>${d.saldo.toLocaleString()}</td>
                                                     <td style={{ textAlign: "right" }}>
-                                                        <input 
-                                                            type="number" 
+                                                        <NumericFormat
                                                             className="modern-input" 
                                                             style={{ textAlign: "right", padding: "4px 8px" }}
                                                             value={importesAplicados[`${d.tipo}_${d.id}`] || ""}
-                                                            onChange={(e) => setImportesAplicados({ ...importesAplicados, [`${d.tipo}_${d.id}`]: e.target.value })}
-                                                            onWheel={(e) => e.target.blur()}
+                                                            onValueChange={(values) => setImportesAplicados({ ...importesAplicados, [`${d.tipo}_${d.id}`]: values.floatValue || "" })}
+                                                            thousandSeparator="."
+                                                            decimalSeparator=","
+                                                            prefix="$ "
+                                                            allowNegative={false}
+                                                            decimalScale={2}
                                                             onFocus={(e) => e.target.select()}
                                                             onBlur={() => {
                                                                 // Sincronizar el total cobrado si es el único medio o está vacío
@@ -363,15 +367,17 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Importe *</label>
-                                            <input
-                                                type="number"
-                                                step="0.01"
+                                            <NumericFormat
                                                 className="modern-input"
                                                 value={p.importe}
-                                                onChange={e => updatePago(p.id, "importe", e.target.value)}
-                                                onWheel={(e) => e.target.blur()}
+                                                onValueChange={(values) => updatePago(p.id, "importe", values.floatValue || "")}
+                                                thousandSeparator="."
+                                                decimalSeparator=","
+                                                prefix="$ "
+                                                allowNegative={false}
+                                                decimalScale={2}
                                                 onFocus={(e) => e.target.select()}
-                                                placeholder="0.00"
+                                                placeholder="$ 0,00"
                                                 required
                                             />
                                         </div>
