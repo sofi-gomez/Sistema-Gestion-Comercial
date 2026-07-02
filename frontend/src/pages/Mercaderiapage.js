@@ -95,7 +95,10 @@ export default function MercaderiaPage() {
       });
       if (res.ok) {
         setConfiguracion(await res.json());
-        setToast({ title: "Configuración Actualizada", message: "Cotización del Dólar actualizada.", type: "success" });
+        setToast({ title: "Precios Actualizados", message: "Cotización del Dólar actualizada y precios en pesos recalculados.", type: "success" });
+        // Recargar productos para reflejar los precios recalculados por el backend
+        const resProd = await apiFetch(API_URL);
+        if (resProd.ok) setProductos(await resProd.json());
       }
     } catch (e) {
       console.error(e);

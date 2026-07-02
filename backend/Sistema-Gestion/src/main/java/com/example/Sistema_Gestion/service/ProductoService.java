@@ -2,6 +2,7 @@ package com.example.Sistema_Gestion.service;
 
 import com.example.Sistema_Gestion.model.Producto;
 import com.example.Sistema_Gestion.repository.ProductoRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
+@Slf4j
 public class ProductoService {
 
     private final ProductoRepository productoRepository;
@@ -184,6 +186,48 @@ public class ProductoService {
             }
         }
         productoRepository.saveAll(productos);
+    }
+
+    @Transactional
+    public void sincronizarPreciosPesosConUSD(BigDecimal nuevaCotizacion) {
+        if (nuevaCotizacion == null || nuevaCotizacion.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("[Sync] Cotización inválida o cero, no se sincronizan precios.");
+            return;
+        }
+
+        List<Producto> productos = productoRepository.findAll();
+        log.info("[Sync] Sincronizando precios. Total productos: {}, cotización: {}", productos.size(), nuevaCotizacion);
+
+        int actualizados = 0;
+        for (Producto p : productos) {
+            boolean pModificado = false;
+
+            if (p.getPrecioCostoUSD() != null && p.getPrecioCostoUSD().compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal nuevoCosto = p.getPrecioCostoUSD().multiply(nuevaCotizacion).setScale(2, RoundingMode.HALF_UP);
+                log.debug("[Sync] Producto '{}': precioCostoUSD={} -> precioCosto={}", p.getNombre(), p.getPrecioCostoUSD(), nuevoCosto);
+                p.setPrecioCosto(nuevoCosto);
+                pModificado = true;
+            }
+
+            if (p.getPrecioVentaUSD() != null && p.getPrecioVentaUSD().compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal nuevoVenta = p.getPrecioVentaUSD().multiply(nuevaCotizacion).setScale(2, RoundingMode.HALF_UP);
+                log.debug("[Sync] Producto '{}': precioVentaUSD={} -> precioVenta={}", p.getNombre(), p.getPrecioVentaUSD(), nuevoVenta);
+                p.setPrecioVenta(nuevoVenta);
+                pModificado = true;
+            }
+
+            if (pModificado) {
+                actualizados++;
+            }
+        }
+
+        log.info("[Sync] Productos con precios USD actualizados: {}/{}", actualizados, productos.size());
+        if (actualizados > 0) {
+            productoRepository.saveAll(productos);
+            log.info("[Sync] Guardado exitoso en base de datos.");
+        } else {
+            log.warn("[Sync] Ningún producto tiene precios en USD cargados. No se actualizó nada. Verificá que los productos tengan precioCostoUSD o precioVentaUSD definidos.");
+        }
     }
 
     public byte[] exportarExcel() throws IOException {
