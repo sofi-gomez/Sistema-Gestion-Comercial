@@ -343,6 +343,7 @@ public class TesoreriaService {
                 if (Boolean.FALSE.equals(m.getAnulado()) && 
                     Boolean.FALSE.equals(m.getCobrado()) &&
                     Boolean.FALSE.equals(m.getRechazado()) &&
+                    "INGRESO".equalsIgnoreCase(m.getTipo()) &&
                     ("CHEQUE".equalsIgnoreCase(m.getMedioPago()) || "CHEQUE_ELECTRONICO".equalsIgnoreCase(m.getMedioPago()))) {
                     results.add(m);
                 }
