@@ -78,19 +78,24 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
         }
     }, [clienteIdPreselected, clienteId, montoSugerido, remitoId]);
 
-    const totalIngresado = pagos.reduce((acc, p) => acc + (parseFloat(p.importe) || 0), 0);
+    const totalIngresado = pagos.reduce((acc, p) => {
+        if (p.medio === "DOLAR_BILLETE") return acc + (parseFloat(p.importeUSD) * parseFloat(p.cotizacionBlue) || 0);
+        return acc + (parseFloat(p.importe) || 0);
+    }, 0);
     const montoPendiente = parseFloat(montoSugerido || 0) - totalIngresado;
 
     const addPago = () => {
         setPagos([...pagos, {
             id: Date.now(),
             medio: "EFECTIVO",
-            importe: montoPendiente > 0 ? montoPendiente.toFixed(2) : "",
+            importe: "",
             banco: "",
             numeroCheque: "",
             librador: "",
             fechaEmision: "",
-            fechaCobro: ""
+            fechaCobro: "",
+            cotizacionBlue: "",
+            importeUSD: ""
         }]);
     };
 
@@ -128,8 +133,13 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
             return;
         }
 
-        if (totalIngresado <= 0) {
-            alert("El monto total debe ser mayor a 0.");
+        if (pagos.some(p => {
+            if (p.medio === "DOLAR_BILLETE") {
+                return !p.importeUSD || !p.cotizacionBlue || parseFloat(p.importeUSD) <= 0 || parseFloat(p.cotizacionBlue) <= 0;
+            }
+            return p.medio !== "SALDO_A_FAVOR" && (!p.importe || parseFloat(p.importe) <= 0);
+        })) {
+            alert("Los importes deben ser mayores a 0 en todos los medios de pago.");
             return;
         }
 
@@ -149,7 +159,6 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                     alert("Por favor complete todos los datos del cheque.");
                     return;
                 }
-                // Validar lógica de fechas
                 if (p.fechaCobro < p.fechaEmision) {
                     alert(`Error en el cheque Nº ${p.numeroCheque}: La fecha de cobro no puede ser anterior a la de emisión.`);
                     return;
@@ -182,12 +191,14 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                 importesPorNotaDebito,
                 mediosPago: pagos.map(p => ({
                     medio: p.medio,
-                    importe: parseFloat(p.importe),
+                    importe: p.medio === "DOLAR_BILLETE" ? (parseFloat(p.importeUSD) * parseFloat(p.cotizacionBlue)) : parseFloat(p.importe),
                     banco: p.medio.includes("CHEQUE") ? p.banco : null,
                     numeroCheque: p.medio.includes("CHEQUE") ? p.numeroCheque : null,
                     librador: p.medio.includes("CHEQUE") ? p.librador : null,
                     fechaEmision: p.medio.includes("CHEQUE") ? p.fechaEmision : null,
-                    fechaCobro: p.medio.includes("CHEQUE") ? p.fechaCobro : null
+                    fechaCobro: p.medio.includes("CHEQUE") ? p.fechaCobro : null,
+                    importeUSD: p.medio === "DOLAR_BILLETE" ? parseFloat(p.importeUSD) : null,
+                    cotizacionBlue: p.medio === "DOLAR_BILLETE" ? parseFloat(p.cotizacionBlue) : null
                 }))
             };
 
@@ -362,25 +373,66 @@ export default function CobroFormModal({ onClose, onSaved, clienteIdPreselected 
                                                 <option value="CHEQUE">Cheque</option>
                                                 <option value="CHEQUE_ELECTRONICO">Cheque Electrónico</option>
                                                 <option value="MERCADO_PAGO">Mercado Pago</option>
+                                                <option value="DOLAR_BILLETE">Dólar Billete</option>
                                                 <option value="SALDO_A_FAVOR">Saldo a Favor</option>
                                             </select>
                                         </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Importe *</label>
-                                            <NumericFormat
-                                                className="modern-input"
-                                                value={p.importe}
-                                                onValueChange={(values) => updatePago(p.id, "importe", values.floatValue || "")}
-                                                thousandSeparator="."
-                                                decimalSeparator=","
-                                                prefix="$ "
-                                                allowNegative={false}
-                                                decimalScale={2}
-                                                onFocus={(e) => e.target.select()}
-                                                placeholder="$ 0,00"
-                                                required
-                                            />
-                                        </div>
+                                        {p.medio !== "DOLAR_BILLETE" ? (
+                                            <div className="form-group">
+                                                <label className="form-label">Importe *</label>
+                                                <NumericFormat
+                                                    className="modern-input"
+                                                    value={p.importe}
+                                                    onValueChange={(values) => updatePago(p.id, "importe", values.floatValue || "")}
+                                                    thousandSeparator="."
+                                                    decimalSeparator=","
+                                                    prefix="$ "
+                                                    allowNegative={false}
+                                                    decimalScale={2}
+                                                    onFocus={(e) => e.target.select()}
+                                                    placeholder="$ 0,00"
+                                                    required
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                                <div>
+                                                    <label className="form-label">Monto (USD) *</label>
+                                                    <NumericFormat
+                                                        className="modern-input"
+                                                        value={p.importeUSD}
+                                                        onValueChange={(values) => updatePago(p.id, "importeUSD", values.floatValue || "")}
+                                                        thousandSeparator="."
+                                                        decimalSeparator=","
+                                                        prefix="U$D "
+                                                        allowNegative={false}
+                                                        decimalScale={2}
+                                                        onFocus={(e) => e.target.select()}
+                                                        placeholder="U$D 0,00"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="form-label">Cotiz. Blue *</label>
+                                                    <NumericFormat
+                                                        className="modern-input"
+                                                        value={p.cotizacionBlue}
+                                                        onValueChange={(values) => updatePago(p.id, "cotizacionBlue", values.floatValue || "")}
+                                                        thousandSeparator="."
+                                                        decimalSeparator=","
+                                                        prefix="$ "
+                                                        allowNegative={false}
+                                                        decimalScale={2}
+                                                        onFocus={(e) => e.target.select()}
+                                                        placeholder="$ 0,00"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div style={{ gridColumn: 'span 2', fontSize: '0.85rem', color: '#64748b' }}>
+                                                    Equivale a: <strong>${(parseFloat(p.importeUSD || 0) * parseFloat(p.cotizacionBlue || 0)).toLocaleString('es-AR', {minimumFractionDigits: 2})}</strong> ARS
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {p.medio.includes("CHEQUE") && (

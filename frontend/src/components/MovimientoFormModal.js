@@ -12,6 +12,10 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
     const [descripcion, setDescripcion] = useState("");
     const [entidad, setEntidad] = useState("");
     const [saving, setSaving] = useState(false);
+    
+    // Campos de Dólar Billete
+    const [importeUSD, setImporteUSD] = useState("");
+    const [cotizacionBlue, setCotizacionBlue] = useState("");
 
     // Campos de cheque
     const [banco, setBanco] = useState("");
@@ -39,21 +43,32 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
             setFechaEmision(movimientoEditar.fechaEmision || "");
             setFechaCobro(movimientoEditar.fechaCobro || "");
             setFechaVencimiento(movimientoEditar.fechaVencimiento || "");
+
+            // Para dólar billete en edición, no lo calculamos a la inversa acá porque 
+            // el movimiento ya se guardó en ARS puro y en la tabla no se persistieron los detalles
+            // Sin embargo, podemos soportar edición parcial en ARS.
         }
     }, [movimientoEditar]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!importe || parseFloat(importe) <= 0) {
-            alert("El importe debe ser mayor a 0");
-            return;
+        if (medioPago === "DOLAR_BILLETE") {
+            if (!importeUSD || parseFloat(importeUSD) <= 0 || !cotizacionBlue || parseFloat(cotizacionBlue) <= 0) {
+                alert("El importe en USD y la cotización blue deben ser mayores a 0");
+                return;
+            }
+        } else {
+            if (!importe || parseFloat(importe) <= 0) {
+                alert("El importe debe ser mayor a 0");
+                return;
+            }
         }
 
         const movimiento = {
             tipo,
             medioPago,
-            importe: parseFloat(importe),
+            importe: medioPago === "DOLAR_BILLETE" ? parseFloat(importeUSD) * parseFloat(cotizacionBlue) : parseFloat(importe),
             referencia: referencia.trim() || null,
             descripcion: descripcion.trim() || null,
             entidad: entidad.trim() || null,
@@ -68,6 +83,11 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
             movimiento.fechaEmision = fechaEmision || null;
             movimiento.fechaCobro = fechaCobro || null;
             movimiento.fechaVencimiento = fechaVencimiento || null;
+        } else if (medioPago === "DOLAR_BILLETE") {
+            const usdFormat = parseFloat(importeUSD).toFixed(2);
+            const cotFormat = parseFloat(cotizacionBlue).toFixed(2);
+            const extraDesc = `USD ${usdFormat} @ $${cotFormat}`;
+            movimiento.descripcion = descripcion ? `${extraDesc} | ${descripcion.trim()}` : extraDesc;
         }
 
         setSaving(true);
@@ -140,25 +160,64 @@ export default function MovimientoFormModal({ onClose, onSaved, movimientoEditar
                                     <option value="CHEQUE">Cheque</option>
                                     <option value="CHEQUE_ELECTRONICO">Cheque Electrónico</option>
                                     <option value="MERCADO_PAGO">Mercado Pago</option>
+                                    <option value="DOLAR_BILLETE">Dólar Billete</option>
                                 </select>
                             </div>
 
                             {/* Importe */}
-                            <div className="form-group">
-                                <label className="form-label">Importe *</label>
-                                <NumericFormat
-                                    className="modern-input"
-                                    value={importe}
-                                    onValueChange={(values) => setImporte(values.floatValue || "")}
-                                    thousandSeparator="."
-                                    decimalSeparator=","
-                                    prefix="$ "
-                                    allowNegative={false}
-                                    decimalScale={2}
-                                    placeholder="$ 0,00"
-                                    required
-                                />
-                            </div>
+                            {medioPago !== "DOLAR_BILLETE" ? (
+                                <div className="form-group">
+                                    <label className="form-label">Importe *</label>
+                                    <NumericFormat
+                                        className="modern-input"
+                                        value={importe}
+                                        onValueChange={(values) => setImporte(values.floatValue || "")}
+                                        thousandSeparator="."
+                                        decimalSeparator=","
+                                        prefix="$ "
+                                        allowNegative={false}
+                                        decimalScale={2}
+                                        placeholder="$ 0,00"
+                                        required
+                                    />
+                                </div>
+                            ) : (
+                                <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <div>
+                                        <label className="form-label">Monto (USD) *</label>
+                                        <NumericFormat
+                                            className="modern-input"
+                                            value={importeUSD}
+                                            onValueChange={(values) => setImporteUSD(values.floatValue || "")}
+                                            thousandSeparator="."
+                                            decimalSeparator=","
+                                            prefix="U$D "
+                                            allowNegative={false}
+                                            decimalScale={2}
+                                            placeholder="U$D 0,00"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="form-label">Cotiz. Blue *</label>
+                                        <NumericFormat
+                                            className="modern-input"
+                                            value={cotizacionBlue}
+                                            onValueChange={(values) => setCotizacionBlue(values.floatValue || "")}
+                                            thousandSeparator="."
+                                            decimalSeparator=","
+                                            prefix="$ "
+                                            allowNegative={false}
+                                            decimalScale={2}
+                                            placeholder="$ 0,00"
+                                            required
+                                        />
+                                    </div>
+                                    <div style={{ gridColumn: 'span 2', fontSize: '0.85rem', color: '#64748b' }}>
+                                        Equivale a: <strong>${(parseFloat(importeUSD || 0) * parseFloat(cotizacionBlue || 0)).toLocaleString('es-AR', {minimumFractionDigits: 2})}</strong> ARS
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Entidad */}
                             <div className="form-group">

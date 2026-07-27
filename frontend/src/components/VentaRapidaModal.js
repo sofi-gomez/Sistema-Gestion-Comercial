@@ -426,6 +426,7 @@ export default function VentaRapidaModal({ onClose, onSaved }) {
                                         <option value="TARJETA_DEBITO">Tarjeta Débito</option>
                                         <option value="TARJETA_CREDITO">Tarjeta Crédito</option>
                                         <option value="MERCADO_PAGO">Mercado Pago</option>
+                                        <option value="DOLAR_BILLETE">Dólar Billete</option>
                                     </select>
                                 </div>
                                 <div className="form-group" style={{ marginTop: '1rem' }}>

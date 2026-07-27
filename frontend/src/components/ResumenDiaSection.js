@@ -12,6 +12,7 @@ const MEDIO_LABELS = {
     TARJETA_DEBITO: "Tarjeta Débito",
     TARJETA_CREDITO: "Tarjeta Crédito",
     MERCADO_PAGO: "Mercado Pago",
+    DOLAR_BILLETE: "Dólar Billete",
     OTRO: "Otro",
 };
 

@@ -17,7 +17,7 @@ public class MovimientoTesoreria {
     }
 
     public enum MedioPago {
-        EFECTIVO, TRANSFERENCIA, TARJETA_DEBITO, TARJETA_CREDITO, CHEQUE, CHEQUE_ELECTRONICO, MERCADO_PAGO
+        EFECTIVO, TRANSFERENCIA, TARJETA_DEBITO, TARJETA_CREDITO, CHEQUE, CHEQUE_ELECTRONICO, MERCADO_PAGO, DOLAR_BILLETE
     }
 
     public enum TipoCheque {
@@ -124,7 +124,8 @@ public class MovimientoTesoreria {
                 "TRANSFERENCIA".equals(this.medioPago) ||
                 "TARJETA_DEBITO".equals(this.medioPago) ||
                 "TARJETA_CREDITO".equals(this.medioPago) ||
-                "MERCADO_PAGO".equals(this.medioPago);
+                "MERCADO_PAGO".equals(this.medioPago) ||
+                "DOLAR_BILLETE".equals(this.medioPago);
     }
 
     private boolean isCheque() {

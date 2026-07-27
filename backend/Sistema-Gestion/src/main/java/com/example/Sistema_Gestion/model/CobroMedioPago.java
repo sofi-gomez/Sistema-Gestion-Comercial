@@ -61,6 +61,14 @@ public class CobroMedioPago {
     @Column(name = "tipo_cheque", length = 20)
     private String tipoCheque; // FISICO, ELECTRONICO
 
+    // ===== Datos de Dólar Billete (solo si medio = DOLAR_BILLETE) =====
+
+    @Column(name = "cotizacion_blue", precision = 10, scale = 2)
+    private java.math.BigDecimal cotizacionBlue;
+
+    @Column(name = "importe_usd", precision = 10, scale = 2)
+    private java.math.BigDecimal importeUSD;
+
     // =================== GETTERS Y SETTERS ===================
 
     public Long getId() {
@@ -149,5 +157,21 @@ public class CobroMedioPago {
 
     public void setTipoCheque(String tipoCheque) {
         this.tipoCheque = tipoCheque;
+    }
+
+    public java.math.BigDecimal getCotizacionBlue() {
+        return cotizacionBlue;
+    }
+
+    public void setCotizacionBlue(java.math.BigDecimal cotizacionBlue) {
+        this.cotizacionBlue = cotizacionBlue;
+    }
+
+    public java.math.BigDecimal getImporteUSD() {
+        return importeUSD;
+    }
+
+    public void setImporteUSD(java.math.BigDecimal importeUSD) {
+        this.importeUSD = importeUSD;
     }
 }

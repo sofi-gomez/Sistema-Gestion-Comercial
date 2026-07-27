@@ -235,7 +235,10 @@ export default function PagoProveedorFormModal({ onClose, onSaved, proveedorIdPr
                                     <select
                                         className="modern-select"
                                         value={medioPago}
-                                        onChange={e => setMedioPago(e.target.value)}
+                                        onChange={e => {
+                                            setMedioPago(e.target.value);
+                                            if (e.target.value === "DOLAR_BILLETE") setMonedaPago("USD");
+                                        }}
                                         required
                                     >
                                         <option value="EFECTIVO">Efectivo</option>
@@ -244,6 +247,7 @@ export default function PagoProveedorFormModal({ onClose, onSaved, proveedorIdPr
                                         <option value="CHEQUE_ELECTRONICO">Cheque Electrónico</option>
                                         <option value="TARJETA_DEBITO">Tarjeta Débito</option>
                                         <option value="TARJETA_CREDITO">Tarjeta Crédito</option>
+                                        <option value="DOLAR_BILLETE">Dólar Billete</option>
                                     </select>
                                 </div>
                             </div>

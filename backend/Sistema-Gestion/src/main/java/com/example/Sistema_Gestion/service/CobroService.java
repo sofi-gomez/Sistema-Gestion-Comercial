@@ -231,6 +231,18 @@ public class CobroService {
                         mov.setLibrador(medio.getLibrador());
                         mov.setFechaEmision(medio.getFechaEmision());
                         mov.setFechaVencimiento(medio.getFechaVencimiento());
+                    } else if ("DOLAR_BILLETE".equals(medio.getMedio())) {
+                        if (medio.getImporteUSD() != null && medio.getCotizacionBlue() != null) {
+                            String detalleDolar = String.format("USD %.2f @ $%.2f", medio.getImporteUSD(), medio.getCotizacionBlue());
+                            mov.setDescripcion("Cobro en Dólar Billete - " + detalleDolar + (desc.equals("Cobro de Cliente") ? "" : " | " + desc));
+                            
+                            // Aseguramos que el importe sea consecuente
+                            java.math.BigDecimal importeCalc = medio.getImporteUSD().multiply(medio.getCotizacionBlue());
+                            medio.setImporte(importeCalc);
+                            mov.setImporte(importeCalc);
+                        } else {
+                            mov.setDescripcion("Cobro en Dólar Billete" + (desc.equals("Cobro de Cliente") ? "" : " | " + desc));
+                        }
                     }
 
                     tesoreriaService.registrarMovimiento(mov);
@@ -579,6 +591,8 @@ public class CobroService {
                         medioLabel = "Mercado Pago";
                     else if ("SALDO_A_FAVOR".equals(rawMedio))
                         medioLabel = "Saldo a Favor";
+                    else if ("DOLAR_BILLETE".equals(rawMedio))
+                        medioLabel = "Dólar Billete";
 
                     String detalleLabel = "";
                     if (rawMedio.contains("CHEQUE")) {
@@ -592,6 +606,12 @@ public class CobroService {
                         detalleLabel = "Transferencia bancaria";
                     } else if ("SALDO_A_FAVOR".equals(rawMedio)) {
                         detalleLabel = "Saldo acreditado de cobros anteriores";
+                    } else if ("DOLAR_BILLETE".equals(rawMedio)) {
+                        if (mp.getImporteUSD() != null && mp.getCotizacionBlue() != null) {
+                            detalleLabel = String.format("USD %.2f (Cotiz: $%.2f)", mp.getImporteUSD(), mp.getCotizacionBlue());
+                        } else {
+                            detalleLabel = "Pago en dólares físicos";
+                        }
                     }
 
                     cs.beginText();
@@ -635,8 +655,17 @@ public class CobroService {
             cs.showText(totalStr);
             cs.endText();
 
+            // Monto en letras
+            y -= 16;
+            String enLetras = "Son pesos: " + montoEnLetras(cobro.getTotalCobrado());
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_OBLIQUE, 9);
+            cs.newLineAtOffset(margin, y);
+            cs.showText(enLetras);
+            cs.endText();
+
             // Línea separadora
-            y -= 18;
+            y -= 12;
             cs.setLineWidth(0.5f);
             cs.moveTo(margin, y);
             cs.lineTo(w - margin, y);
@@ -758,5 +787,66 @@ public class CobroService {
         if (s == null)
             return "";
         return s.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
+    }
+
+    /**
+     * Convierte un BigDecimal a su representación en letras en español (estilo Argentina).
+     * Ej: 1200.50 → "UN MIL DOSCIENTOS CON 50/100"
+     */
+    private String montoEnLetras(java.math.BigDecimal monto) {
+        if (monto == null) return "CERO CON 00/100";
+        long entero = monto.longValue();
+        int centavos = monto.subtract(new java.math.BigDecimal(entero))
+                .multiply(new java.math.BigDecimal(100))
+                .setScale(0, java.math.RoundingMode.HALF_UP)
+                .intValue();
+        String letras = convertirEnteroALetras(entero).trim().toUpperCase();
+        return letras + " CON " + String.format("%02d", centavos) + " CENTAVOS";
+    }
+
+    private String convertirEnteroALetras(long n) {
+        if (n == 0) return "CERO";
+        if (n < 0) return "MENOS " + convertirEnteroALetras(-n);
+
+        String[] unidades = {"", "UN", "DOS", "TRES", "CUATRO", "CINCO",
+                "SEIS", "SIETE", "OCHO", "NUEVE", "DIEZ",
+                "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE",
+                "DIECISEIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE"};
+        String[] decenas = {"", "DIEZ", "VEINTE", "TREINTA", "CUARENTA",
+                "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"};
+        String[] centenas = {"", "CIENTO", "DOSCIENTOS", "TRESCIENTOS",
+                "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS",
+                "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"};
+
+        if (n < 20) return unidades[(int) n];
+        if (n == 20) return "VEINTE";
+        if (n < 30) return "VEINTI" + unidades[(int) (n - 20)].toLowerCase();
+        if (n < 100) {
+            String d = decenas[(int) (n / 10)];
+            int r = (int) (n % 10);
+            return r == 0 ? d : d + " Y " + unidades[r];
+        }
+        if (n == 100) return "CIEN";
+        if (n < 1000) {
+            String c = centenas[(int) (n / 100)];
+            long r = n % 100;
+            return r == 0 ? c : c + " " + convertirEnteroALetras(r);
+        }
+        if (n < 2000) return "MIL" + (n % 1000 == 0 ? "" : " " + convertirEnteroALetras(n % 1000));
+        if (n < 1000000) {
+            long miles = n / 1000;
+            long resto = n % 1000;
+            return convertirEnteroALetras(miles) + " MIL" + (resto == 0 ? "" : " " + convertirEnteroALetras(resto));
+        }
+        if (n == 1000000) return "UN MILLON";
+        if (n < 2000000) return "UN MILLON" + (n % 1000000 == 0 ? "" : " " + convertirEnteroALetras(n % 1000000));
+        if (n < 1000000000L) {
+            long millones = n / 1000000;
+            long resto = n % 1000000;
+            return convertirEnteroALetras(millones) + " MILLONES" + (resto == 0 ? "" : " " + convertirEnteroALetras(resto));
+        }
+        long billones = n / 1000000000L;
+        long resto = n % 1000000000L;
+        return convertirEnteroALetras(billones) + " MIL MILLONES" + (resto == 0 ? "" : " " + convertirEnteroALetras(resto));
     }
 }
